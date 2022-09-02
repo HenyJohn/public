@@ -1,0 +1,171 @@
+#include "asw_protocol_ftp.h"
+
+#define ABS(x) (((x) > 0) ? (x) : -(x))
+#define CONSTRAIN(amt, low, high) ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt)))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+static const char *TAG = "FTP";
+static char *MOUNT_POINT = "/inv";
+
+// char *data_path = "/inv";
+// char *base_path = "/home";
+
+#define CONFIG_FTP_SERVER "ftp.sspcdn-a.net" //"192.168.32.106" //"demo.wftpserver.com"
+#define CONFIG_FTP_PORT 21
+// #define CONFIG_FTP_USER "demo"
+// #define CONFIG_FTP_PSWD "demo"
+
+#define CONFIG_FTP_USER "DEVSN686291" // "DEVSN658230" //"DEVSN686595"  //"tian"
+#define CONFIG_FTP_PSWD "dffbc99dfc"  //"f5eb76b9e9"  //"c88fa9bb62"  //"1234"
+#define CONFIG_NUM_CLIENT 5
+
+char srcFileName[70];
+char dstFileName[64];
+char srcFileDtTm[40] = {0};
+// char srcFileName[64];
+
+FtpClient *pftpClient = NULL;
+static NetBuf_t *ftpClientNetBuf = NULL;
+
+int g_ftp_filelist_num = 0;
+char str_ftp_filelist[CONFIG_NUM_CLIENT][60] = {0};
+
+void asw_ftp_init()
+{
+	// sprintf(srcFileName, "%s/hello.txt", MOUNT_POINT);
+	// sprintf(dstFileName, "hello.txt");
+
+	// Open FTP server
+	ESP_LOGI(TAG, "ftp server:%s,port:%d ", CONFIG_FTP_SERVER, CONFIG_FTP_PORT); // CONFIG_FTP_SERVER
+	ESP_LOGI(TAG, "ftp user  :%s", CONFIG_FTP_USER);
+
+	pftpClient = getFtpClient();
+
+	g_ftp_filelist_num = 0;
+}
+
+int get_ftp_filelist_size()
+{
+	printf("\n=== get ftp file list size: %d\n", g_ftp_filelist_num);
+	return g_ftp_filelist_num;
+}
+
+void asw_ftp_create_file(char *psn, char *content)
+{
+	printf("\n content: %s\n", psn);
+
+	memset(srcFileName, 0, sizeof(srcFileName));
+	memset(srcFileDtTm, 0, sizeof(srcFileDtTm));
+	/**************************************/
+
+	struct tm curr_time;
+	time_t t = time(NULL);
+
+	localtime_r(&t, &curr_time);
+	// curr_time.tm_year += 1900;
+
+	sprintf(srcFileDtTm, "%04d_%02d%02d_%02d%02d", curr_time.tm_year + 1900, curr_time.tm_mon + 1, curr_time.tm_mday, curr_time.tm_hour, curr_time.tm_min);
+
+	/*************************************/
+
+	sprintf(str_ftp_filelist[g_ftp_filelist_num], "%s_%s.csv", psn, srcFileDtTm);
+
+	sprintf(srcFileName, "%s/%s", MOUNT_POINT, str_ftp_filelist[g_ftp_filelist_num]);
+
+	g_ftp_filelist_num++;
+
+	FILE *f = fopen(srcFileName, "w");
+	if (f == NULL)
+	{
+		ESP_LOGE(TAG, "Failed to open file for writing %s", srcFileName);
+		return;
+	}
+	int res = fprintf(f, "%s\r\n", content);
+
+	if (res > 0)
+	{
+
+		if (g_ftp_filelist_num > CONFIG_NUM_CLIENT)
+		{
+			g_ftp_filelist_num = 0;
+			ESP_LOGW(TAG, " WARNIGN  filelist is full num > 5");
+		}
+
+		ESP_LOGI(TAG, "SUCCESS Wrote the text on %s-%d \n", srcFileName, g_ftp_filelist_num);
+	}
+	else
+	{
+		ESP_LOGE(TAG, "ERRO  Wrote the text on %s", srcFileName);
+	}
+
+	fclose(f);
+}
+
+int asw_ftp_upload()
+{
+	int res = -1;
+
+	if (g_ftp_filelist_num <= 0)
+		return 0;
+
+	if (pftpClient == NULL)
+		pftpClient = getFtpClient();
+
+	uint8_t index = 0;
+	int connect = pftpClient->ftpClientConnect(CONFIG_FTP_SERVER, CONFIG_FTP_PORT, &ftpClientNetBuf); // 21
+	ESP_LOGI(TAG, "connect=%d", connect);
+	if (connect == 0)
+	{
+		ESP_LOGE(TAG, "FTP server connect fail");
+		res = -1;
+		goto END;
+	}
+	// CONFIG_FTP_USER
+	// Login FTP server
+	int login = pftpClient->ftpClientLogin(CONFIG_FTP_USER, CONFIG_FTP_PSWD, ftpClientNetBuf); // CONFIG_FTP_PASSWORD
+	ESP_LOGI(TAG, "login=%d", login);
+	if (login == 0)
+	{
+		ESP_LOGE(TAG, "FTP server login fail");
+		res = -2;
+		goto END;
+	}
+
+	ESP_LOGW(TAG, "filelist num:%d", g_ftp_filelist_num);
+
+	for (index = 0; index < MIN(g_ftp_filelist_num, CONFIG_NUM_CLIENT); index++)
+	{
+		sprintf(dstFileName, "%s/%s", MOUNT_POINT, str_ftp_filelist[index]);
+
+		ESP_LOGI(TAG, "index %d:%s", index, dstFileName);
+		int res = pftpClient->ftpClientPut(dstFileName, str_ftp_filelist[index], FTP_CLIENT_TEXT, ftpClientNetBuf);
+		
+		ESP_LOGI(TAG, "ftpClientPut %s ---> %s,res:%d", str_ftp_filelist[index], dstFileName, res);
+
+		if (res != 1)
+		{
+			ESP_LOGE(TAG,"ftp client put is ERRO: %d",res);
+			goto END;
+		}
+		usleep(200);
+
+		//刪除本地文件
+		int rst = unlink(dstFileName);
+		if (rst != 0)
+			ESP_LOGI(TAG, " ERRO Hanpped,when Deleted %s", dstFileName);
+		// remove(dstFileName);
+		printf("\n==== ftp upload <<<  current ftp file list size:%d\n", g_ftp_filelist_num);
+	}
+
+	res = 0;
+
+END:
+	if (ftpClientNetBuf != NULL)
+		pftpClient->ftpClientQuit(ftpClientNetBuf);
+	pftpClient = NULL;
+	ftpClientNetBuf = NULL;
+	g_ftp_filelist_num = 0;
+	return res;
+}
+
