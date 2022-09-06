@@ -1,1 +1,2 @@
-11
+1.替换DEMO_DEVICE_NAME_TEST
+2.kaco_conv_psn
