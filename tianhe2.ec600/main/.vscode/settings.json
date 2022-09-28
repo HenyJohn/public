@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "data_process.h": "c",
+        "mqueue.h": "c"
+    }
+}
