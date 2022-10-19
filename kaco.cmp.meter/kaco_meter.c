@@ -353,12 +353,10 @@ static float iee754_to_float(uint_32 stored_data)
     return f;
 }
 
-
 void md_read_sdm630_uip(void)
 {
     ;
 }
-
 
 int md_query_meter_data(unsigned char meter_mode, unsigned char slaveadd, char type)
 {
