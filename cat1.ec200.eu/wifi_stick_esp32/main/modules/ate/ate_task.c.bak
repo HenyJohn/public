@@ -1,0 +1,258 @@
+#include "inv_com.h"
+#include "cJSON.h"
+#include "asw_store.h"
+#include "device_data.h"
+#include "esp_log.h"
+
+#define ATE_BUF_SIZE 512
+
+#define TERMINATOR "\r\n"
+#define SPLITTER "*"
+
+#define ATE_RESP_OK "ok\r\n"
+#define ATE_RESP_ERR "err\r\n"
+extern int work_mode;
+
+void paraget_handler(int fd, char *body)
+{
+    cJSON *res = cJSON_CreateObject();
+    char *msg = NULL;
+    char buf[20] = {0};
+
+    Setting_Para setting = {0};
+
+    general_query(NVS_ATE, &setting);
+    ESP_LOGE("ATE", "para get %d %d \n", setting.meter_add, setting.typ);
+    cJSON_AddStringToObject(res, "psn", setting.psn);
+    cJSON_AddStringToObject(res, "key", setting.reg_key);
+    cJSON_AddNumberToObject(res, "typ", setting.typ);
+    cJSON_AddStringToObject(res, "nam", setting.nam);
+    cJSON_AddStringToObject(res, "mod", setting.mod);
+    cJSON_AddStringToObject(res, "muf", setting.mfr);
+    cJSON_AddStringToObject(res, "brd", setting.brw);
+    cJSON_AddStringToObject(res, "hw", setting.hw);
+    cJSON_AddStringToObject(res, "sw", FIRMWARE_REVISION);
+    cJSON_AddStringToObject(res, "wsw", MONITOR_MODULE_VERSION);
+    get_time(buf, sizeof(buf));
+    cJSON_AddStringToObject(res, "tim", buf);
+    cJSON_AddStringToObject(res, "pdk", setting.product_key);
+    cJSON_AddStringToObject(res, "ser", setting.device_secret);
+    cJSON_AddNumberToObject(res, "status", 1);
+
+    cJSON_AddStringToObject(res, "ali_ip", setting.host);
+    cJSON_AddNumberToObject(res, "ali_port", setting.port);
+    cJSON_AddNumberToObject(res, "meter_en", setting.meter_en);
+    cJSON_AddNumberToObject(res, "meter_add", setting.meter_add);
+    cJSON_AddNumberToObject(res, "meter_mod", setting.meter_mod);
+
+    msg = cJSON_PrintUnformatted(res);
+    printf("reply msg: %s\n", msg);
+    ESP_LOGE("ATE", "mem left --2: %d bytes", esp_get_free_heap_size());
+    uart_write_bytes(fd, msg, strlen(msg));
+    ESP_LOGE("ATE", "mem left --3: %d bytes", esp_get_free_heap_size());
+
+    cJSON_Delete(res);
+}
+
+void reboot_handler(int fd, char *body)
+{
+    ate_reboot_t msg = {0};
+    memcpy(msg, "rebooting", strlen("rebooting"));
+    general_add(NVS_ATE_REBOOT, msg);
+    esp_restart();
+}
+
+void apget_handler(int fd, char *body)
+{
+    cJSON *res = cJSON_CreateObject();
+    char *msg = NULL;
+    // char buf[70] = {0};
+
+    wifi_ap_para_t ap_para = {0};
+    general_query(NVS_AP_PARA, &ap_para);
+
+    cJSON_AddStringToObject(res, "ssid", ap_para.ssid);
+    cJSON_AddStringToObject(res, "password", ap_para.password);
+    // cJSON_AddNumberToObject(res, "typ", 1);
+
+    msg = cJSON_PrintUnformatted(res);
+    uart_write_bytes(fd, msg, strlen(msg));
+
+    cJSON_Delete(res);
+}
+
+void apset_handler(int fd, char *body)
+{
+    wifi_ap_para_t ap_para = {0};
+    cJSON *json;
+    printf("%s\n", body);
+    json = cJSON_Parse(body);
+    if (json == NULL)
+        goto ERR;
+
+    getJsonStr(ap_para.ssid, "ssid", sizeof(ap_para.ssid), json);
+    getJsonStr(ap_para.password, "password", sizeof(ap_para.password), json);
+
+    general_add(NVS_AP_PARA, &ap_para);
+    uart_write_bytes(fd, ATE_RESP_OK, strlen(ATE_RESP_OK));
+    cJSON_Delete(json);
+    return;
+ERR:
+    uart_write_bytes(fd, ATE_RESP_ERR, strlen(ATE_RESP_ERR));
+    cJSON_Delete(json);
+    return;
+}
+
+void paraset_handler(int fd, char *body)
+{
+    Setting_Para setting = {0};
+    cJSON *json;
+    printf("%s\n", body);
+    json = cJSON_Parse(body);
+    if (json == NULL)
+        goto ERR;
+    getJsonStr(setting.apn, "apn", sizeof(setting.apn), json);
+    getJsonStr(setting.psn, "psn", sizeof(setting.psn), json);
+    getJsonStr(setting.reg_key, "key", sizeof(setting.reg_key), json);
+
+    wifi_ap_para_t ap_para = {0};
+    sprintf(ap_para.ssid, "%s%s", "AISWEI-", setting.psn + strlen(setting.psn) - 4);
+    sprintf(ap_para.password, "%s", setting.reg_key);
+    general_add(NVS_AP_PARA, &ap_para);
+
+    getJsonNum(&setting.typ, "typ", json);
+    getJsonStr(setting.nam, "nam", sizeof(setting.nam), json);
+    getJsonStr(setting.mod, "mod", sizeof(setting.mod), json);
+    getJsonStr(setting.mfr, "muf", sizeof(setting.mfr), json);
+    getJsonStr(setting.brw, "brd", sizeof(setting.brw), json);
+    getJsonStr(setting.hw, "hw", sizeof(setting.hw), json);
+    //getJsonStr(setting.sw, "sw", sizeof(setting.sw), json);
+    getJsonStr(setting.wsw, "wsw", sizeof(setting.wsw), json);
+    getJsonStr(setting.product_key, "pdk", sizeof(setting.product_key), json);
+    getJsonStr(setting.device_secret, "ser", sizeof(setting.device_secret), json);
+
+    getJsonStr(setting.host, "ali_ip", sizeof(setting.host), json);
+    getJsonNum(&setting.port, "ali_port", json);
+    getJsonNum(&setting.meter_en, "meter_en", json);
+    getJsonNum(&setting.meter_add, "meter_add", json);
+    getJsonNum(&setting.meter_mod, "meter_mod", json);
+
+    if (legal_check(setting.reg_key) == -1 || legal_check(setting.psn) == -1)
+    {
+        goto ERR;
+    }
+
+    general_add(NVS_ATE, &setting);
+
+    uart_write_bytes(fd, ATE_RESP_OK, strlen(ATE_RESP_OK));
+    cJSON_Delete(json);
+    return;
+ERR:
+    uart_write_bytes(fd, ATE_RESP_ERR, strlen(ATE_RESP_ERR));
+    cJSON_Delete(json);
+    return;
+}
+
+void nvs_clear_handler(int fd, char *body)
+{
+    asw_nvs_clear();
+    asw_db_open();
+    ate_reboot_t msg = {0};
+    memcpy(msg, "rebooting", strlen("rebooting"));
+    general_add(NVS_ATE_REBOOT, msg);
+    esp_restart();
+}
+
+struct ate_command
+{
+    const char *cmd;                  // ATE command
+    void (*hook)(int fd, char *body); // hook function
+};
+
+static const struct ate_command ate_cmd_tab[] = {
+    {"reboot", reboot_handler},
+    {"nvs_clear", nvs_clear_handler},
+    {"paraset", paraset_handler}, //apn,aliyun:host,port,psn,keepalive_ms,
+    {"paraget", paraget_handler},
+    {"apset", apset_handler},
+    {"apget", apget_handler}};
+
+void ate_handler(int fd, char *cmd_buf, int size)
+{
+    char buf[ATE_BUF_SIZE] = {0};  //calloc(ATE_BUF_SIZE, 1);
+    char cmd[ATE_BUF_SIZE] = {0};  //calloc(ATE_BUF_SIZE, 1);
+    char body[ATE_BUF_SIZE] = {0}; //calloc(ATE_BUF_SIZE, 1);
+    char *splitter_addr = NULL;
+    int cmd_count = sizeof(ate_cmd_tab) / sizeof(struct ate_command);
+    int i;
+
+    memcpy(buf, cmd_buf, size);
+    splitter_addr = strstr(buf, SPLITTER);
+    if (splitter_addr != NULL)
+    {
+        memcpy(cmd, buf, splitter_addr - buf);
+        strncpy(body, splitter_addr + strlen(SPLITTER), ATE_BUF_SIZE);
+    }
+    else
+    {
+        return;
+    }
+    for (i = 0; i < cmd_count; i++)
+    {
+        if (strcmp(ate_cmd_tab[i].cmd, cmd) == 0)
+            break;
+        if (i == cmd_count - 1)
+            return;
+    }
+    (ate_cmd_tab[i].hook)(fd, body);
+}
+
+int ate_reboot_check(void)
+{
+    int res = 0;
+    char frame[ATE_BUF_SIZE] = {0};
+    int frame_len;
+    ate_reboot_t will = {0};
+    general_query(NVS_ATE_REBOOT, will);
+
+    if (strcmp(will, "rebooting") == 0)
+    {
+        uart_write_bytes(CAT1_UART, ATE_RESP_OK, strlen(ATE_RESP_OK));
+        res = 1;
+    }
+
+    memset(will, 0, sizeof(will));
+    memcpy(will, "idle", strlen("idle"));
+    general_add(NVS_ATE_REBOOT, will);
+    return res;
+}
+
+void ate_service(void)
+{
+    // serialport_init(ATE_UART);
+
+    if (1) //ATE_FUN)
+    {
+        //ESP_LOGI("qqqqq", "pppppppp  %d bytes", esp_get_free_heap_size());
+        //char *frame = malloc(ATE_BUF_SIZE);
+        //ESP_LOGI("qqqqq", "mmmmmmmmmm %d bytes", esp_get_free_heap_size());
+        char frame[ATE_BUF_SIZE] = {0};
+        int frame_len;
+
+        char ip[16] = {0};
+        while (1)
+        {
+            ESP_LOGI("available", "mem %d bytes", esp_get_free_heap_size());
+            frame_len = 0;
+            memset(frame, 0, ATE_BUF_SIZE);
+            recv_bytes_frame_waitting_nomd(CAT1_UART, frame, &frame_len);
+            if (frame_len > 0)
+            {
+                printf("content:%s len:%d\n", frame, frame_len);
+                /** 处理收到的帧*/
+                ate_handler(CAT1_UART, frame, frame_len);
+            }
+            usleep(50000);
+        }
+    }
+}

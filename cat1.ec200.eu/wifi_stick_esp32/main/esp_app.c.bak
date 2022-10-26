@@ -1,0 +1,127 @@
+/* Hello World Example
+
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_spi_flash.h"
+#include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
+#include <string.h>
+
+#include "esp_timer.h"
+// #include "json_object.h"
+#include "my_hello.h"
+
+#include <stdio.h>
+#include "json.h"
+#include <stdint.h>
+
+void get_mobile_time(char *p_date, int len)
+{
+    time_t t = time(0);
+    strftime(p_date, len, "%H:%M:%S %d/%m/%Y", localtime(&t));
+}
+
+void vTaskCode_1(void *pvParameters)
+{
+    char buf[20] = {0};
+    while (1)
+    {
+        // printf("task 1\n");
+        // vTaskDelay(1000 / portTICK_PERIOD_MS);
+        memset(buf, 0, sizeof(buf));
+        get_mobile_time(buf, sizeof(buf));
+        printf("%s\n", buf);
+        sleep(2);
+    }
+}
+
+void vTaskCode_2(void *pvParameters)
+{
+    int64_t time_us = 0;
+
+    char buf[] = "{\"name\":\"wangdan\"}";
+    json_object *new_obj = NULL;
+    char body[40];
+    new_obj = json_tokener_parse(buf); // buf->json
+    if (is_error(new_obj))
+    {
+        memset(body, 0x00, 40);
+        sprintf(body, "{\"dat\":\"err\"}");
+    }
+    json_object_object_foreach(new_obj, key, val) //search value by key
+    {
+        if (!strcmp(key, "name"))
+        {
+            printf("name:%s\n", json_object_get_string(val));
+        }
+    }
+
+    while (1)
+    {
+        // vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // time_us = esp_timer_get_time();
+        // printf("time since run, us:%lld\n", time_us);
+        sleep(1);
+    }
+}
+
+void app_main()
+{
+    my_print();
+    // vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // fflush(stdout);
+    // esp_restart();
+
+    struct timeval tv;
+    struct tm ptime;
+
+    ptime.tm_year = 2020;
+    ptime.tm_mon = 5;
+    ptime.tm_mday = 21;
+    ptime.tm_hour = 9;
+    ptime.tm_min = 54;
+    ptime.tm_sec = 0;
+
+    ptime.tm_year -= 1900;
+    ptime.tm_mon -= 1;
+
+    tv.tv_sec = mktime(&ptime);
+    settimeofday(&tv, NULL);
+
+    TaskHandle_t xHandle = NULL;
+
+    /* Create the task, storing the handle. */
+    xTaskCreate(
+        vTaskCode_1, /* Function that implements the task. */
+        "task-1",    /* Text name for the task. */
+        2048,        /* Stack size in words, not bytes. */
+        (void *)1,   /* Parameter passed into the task. */
+        5,           /* Priority at which the task is created. */
+        &xHandle);   /* Used to pass out the created task's handle. */
+
+    xTaskCreate(
+        vTaskCode_2, /* Function that implements the task. */
+        "task-1",    /* Text name for the task. */
+        2048,        /* Stack size in words, not bytes. */
+        (void *)1,   /* Parameter passed into the task. */
+        5,           /* Priority at which the task is created. */
+        &xHandle);
+
+    xTaskCreate(
+        vTaskCode_2, /* Function that implements the task. */
+        "task-1",    /* Text name for the task. */
+        2048,        /* Stack size in words, not bytes. */
+        (void *)1,   /* Parameter passed into the task. */
+        5,           /* Priority at which the task is created. */
+        &xHandle);
+}
