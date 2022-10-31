@@ -3,3 +3,7 @@ uint8_t is_parallel; // 1：并联模式; 0:普通模式
 uint16_t host_adr;   //并联模式，主机地址
 
 PROTOCOL_VERTION_SUPPORT_PARALLEL
+
+
+INV_REG_ADDR_SET_PARALLEL
+INV_REG_ADDR_SET_HOST
