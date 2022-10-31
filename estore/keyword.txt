@@ -1,11 +1,4 @@
-host_adr --action:operation 设置主机
-static char valueJson[NUM_SETTING_OPRT][20] = {
-    "reboot",
-    "factory_reset",
-    "ufs_format",
-    "setscan",
-    "parallel",//1-并机
-    "ssc" //光储充功能
-};
-
+uint8_t ssc_enable;  //光储充模式 1-开启，0-关闭
+uint8_t is_parallel; // 1：并联模式; 0:普通模式
+uint16_t host_adr;   //并联模式，主机地址
 
