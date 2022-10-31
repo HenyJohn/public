@@ -1,2 +1,11 @@
-host_adr --operation 设置主机
+host_adr --action:operation 设置主机
+static char valueJson[NUM_SETTING_OPRT][20] = {
+    "reboot",
+    "factory_reset",
+    "ufs_format",
+    "setscan",
+    "parallel",//1-并机
+    "ssc" //光储充功能
+};
+
 
