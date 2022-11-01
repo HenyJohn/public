@@ -327,10 +327,11 @@ int sha256_file_check(char *path)
     int nread;
     int count = 0;
     int res = 0;
-    // #if DEBUG_PRINT_ENABLE
+#if DEBUG_PRINT_ENABLE
 
+    printf("q11111111111111111111111\n");
     printf("open path = %s@sha256_file_check\n", path);
-    // #endif
+#endif
     fp = fopen(path, "rb");
     if (fp == NULL)
     {

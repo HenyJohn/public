@@ -27,10 +27,10 @@ uint16_t meter_pro[][8] = {
     {0x000C, 70, 0, 60, 62, 12, 6, 18},         // 3 estron 220
     {0x000C, 70, 0, 60, 62, 12, 6, 18},         // 4 estron 120
     {0x0001, 20, 4, 10, 12, 0x00FF, 0x00FF, 6}, // 5 hu tai
-    {0x2000, 10, 2, 6, 8, 3, 4, 5},             // 6 ACTEL
+    {0x2000, 10, 2, 6, 8, 3, 4, 5},              // 6 ACTEL
 
 #if TRIPHASE_ARM_SUPPORT
-                                    //增加一个类型，第七行，如果行数不对，前后的内容中的下标都要同步更改
+                                   //增加一个类型，第七行，如果行数不对，前后的内容中的下标都要同步更改
     {0x1921, 17, 0, 9, 11, 4, 2, 6}, // 11 AISWEI-INV-METER
 #endif
 };
@@ -139,7 +139,7 @@ int is_time_valid(void)
 //-------------------------------------//
 int parse_sync_time(void)
 {
-    return 0; //
+    return 0; //[tgl mark] why?
 }
 //---------------------------------//
 
@@ -192,9 +192,9 @@ int8_t pack_SDM_meter_fun(int type, uint8_t *buf, uint16_t len)
         meter_real_factory = get_f32_from_u16(input_reg, pf_idx) * 10000; // 0.0001,pf
                                                                           // m_inv_meter.invdata.fac = get_f32_from_u16(input_reg, 58) * 100;        // 0.01 Hz
                                                                           // meter_real_factory = get_f32_from_u16(input_reg, pf_idx) * 10000;       // 0.0001,pf
-                                                                          // #if DEBUG_PRINT_ENABLE
-        ASW_LOGI("\n-----[tgl debug print]--------\n  -2- fast read pac:%d\n", m_fast_read_pac);
-        // #endif
+#if DEBUG_PRINT_ENABLE
+        printf("\n-----[tgl debug print]--------\n  -2- fast read pac:%d\n", m_fast_read_pac);
+#endif
     }
 
     if (type == 6)
@@ -229,16 +229,63 @@ void pack_irdIM1281B_meter_fun(uint8_t *buf, uint16_t len)
         m_inv_meter.invdata.e_in_total = get_u32_from_res_frame_4B_reg(0x50, buf) / 10000;  // positive kWh
         m_inv_meter.invdata.e_out_total = get_u32_from_res_frame_4B_reg(0x51, buf) / 10000; // negative kWh
 
-        ASW_LOGI("volt %f [V]\n", (float)(m_inv_meter.invdata.vac[0] * 0.1));
-        ASW_LOGI("curr %f [A]\n", (float)((int)m_inv_meter.invdata.iac[0] * 0.01));
-        ASW_LOGI("pac %d [W]\n", (int)m_inv_meter.invdata.pac);
-        ASW_LOGI("e %u [kWh]\n", m_inv_meter.invdata.e_total);
-        ASW_LOGI("pf %f\n", (float)((int)m_inv_meter.invdata.cosphi * 0.01));
-        ASW_LOGI("freq %f [Hz]\n", (float)(m_inv_meter.invdata.fac * 0.01));
-        ASW_LOGI("e+ %u [kWh]\n", m_inv_meter.invdata.e_in_total);
-        ASW_LOGI("e- %u [kWh]\n", m_inv_meter.invdata.e_out_total);
+        ESP_LOGI(TAG, "volt %f [V]\n", (float)(m_inv_meter.invdata.vac[0] * 0.1));
+        ESP_LOGI(TAG, "curr %f [A]\n", (float)((int)m_inv_meter.invdata.iac[0] * 0.01));
+        ESP_LOGI(TAG, "pac %d [W]\n", (int)m_inv_meter.invdata.pac);
+        ESP_LOGI(TAG, "e %u [kWh]\n", m_inv_meter.invdata.e_total);
+        ESP_LOGI(TAG, "pf %f\n", (float)((int)m_inv_meter.invdata.cosphi * 0.01));
+        ESP_LOGI(TAG, "freq %f [Hz]\n", (float)(m_inv_meter.invdata.fac * 0.01));
+        ESP_LOGI(TAG, "e+ %u [kWh]\n", m_inv_meter.invdata.e_in_total);
+        ESP_LOGI(TAG, "e- %u [kWh]\n", m_inv_meter.invdata.e_out_total);
 
         meter_real_factory = get_i32_from_res_frame_4B_reg(0x4C, buf) * 10; // 0.0001, pf -------------- regulate
+    }
+}
+//-------------------------------//
+void pack_acrelADL200_meter_fun(uint8_t *buf, uint16_t len, uint8_t frame_order)
+{
+    /** 第一帧*/
+    if (frame_order == 1)
+    {
+        if (len == 19)
+        {
+            //[tgl mark] 获取的数据的位数和符号类型不匹配
+            g_start_addr = 0x0B;
+            m_inv_meter.invdata.vac[0] = get_u16_from_res_frame(0x0B, buf);             // 0.1V
+            m_inv_meter.invdata.iac[0] = get_u16_from_res_frame(0x0C, buf);             // 0.01A
+            m_inv_meter.invdata.pac = (int)get_i16_from_res_frame(0x0D, buf);           // W ----------------- regulate
+            m_inv_meter.invdata.qac = (int)get_i16_from_res_frame(0x0E, buf);           // Var
+            m_inv_meter.invdata.sac = get_u16_from_res_frame(0x0F, buf);                // VA
+            m_inv_meter.invdata.cosphi = (int)(get_i16_from_res_frame(0x10, buf) / 10); // 0.01
+            m_inv_meter.invdata.fac = get_u16_from_res_frame(0x11, buf);                // 0.01Hz
+
+            ESP_LOGI(TAG, "volt %f [V]\n", (float)(m_inv_meter.invdata.vac[0] * 0.1));
+            ESP_LOGI(TAG, "curr %f [A]\n", (float)(m_inv_meter.invdata.iac[0] * 0.01));
+            ESP_LOGI(TAG, "pac %d [W]\n", (int)m_inv_meter.invdata.pac);
+            ESP_LOGI(TAG, "qac %d [Var]\n", (int)m_inv_meter.invdata.qac);
+            ESP_LOGI(TAG, "sac %u [VA]\n", m_inv_meter.invdata.sac);
+
+            ESP_LOGI(TAG, "pf %f\n", (float)((int)m_inv_meter.invdata.cosphi * 0.01));
+            ESP_LOGI(TAG, "freq %f [Hz]\n", (float)(m_inv_meter.invdata.fac * 0.01));
+            ESP_LOGI(TAG, "\n");
+
+            meter_real_factory = get_i16_from_res_frame(0x10, buf) * 10; // 0.0001, pf -------------- regulate
+
+            ESP_LOGI(TAG, "pf: %d [0.0001]\n", (int)meter_real_factory);
+        }
+    }
+    /** 第二帧*/
+    else if (frame_order == 2)
+    {
+        if (len == 29)
+        {
+            g_start_addr = 0x68;
+            m_inv_meter.invdata.e_in_total = get_u32_from_res_frame(0x68, buf);  /** 0.01kWh*/
+            m_inv_meter.invdata.e_out_total = get_u32_from_res_frame(0x72, buf); /** 0.01kWh*/
+
+            ESP_LOGI(TAG, "e+ %u [kWh] %u [0.01kWh]\n", m_inv_meter.invdata.e_in_total / 100, m_inv_meter.invdata.e_in_total);
+            ESP_LOGI(TAG, "e- %u [kWh] %u [0.01kWh]\n", m_inv_meter.invdata.e_out_total / 100, m_inv_meter.invdata.e_out_total);
+        }
     }
 }
 
@@ -264,31 +311,42 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
             if (res != ASW_OK)
                 return res;
         }
+        /** 艾瑞达（单帧）*/
+        else if (type == METER_IREADER_IM1281B) // ireader
+        {
+            pack_irdIM1281B_meter_fun(buf, len);
+        }
+        /** 安科瑞*/
+        else if (type == METER_ACREL_ADL200)
+        {
+            pack_acrelADL200_meter_fun(buf, len, frame_order);
+        }
 
 #if TRIPHASE_ARM_SUPPORT
-        else if (type == 11) //
-        {
-            uint16_t pac_idx = 3 + 2 * meter_pro[7][2];                                    // index of the ac power
-            uint16_t etl_in_idx = 3 + 2 * meter_pro[7][3];                                 // index of the total energy input
-            uint16_t etl_ou_idx = 3 + 2 * meter_pro[7][4];                                 // index of the total energy output
-            uint16_t qac_idx = 3 + 2 * meter_pro[7][5];                                    // index of the reactive power
-            uint16_t sac_idx = 3 + 2 * meter_pro[7][6];                                    // index of the apparent power
-            uint16_t pf_idx = 3 + 2 * meter_pro[7][7];                                     // index of the power factor
-                                                                                           //
-            m_inv_meter.invdata.pac = get_u32_from_u8arry(&buf[pac_idx]);                  // W for cloud
-            m_fast_read_pac = get_u32_from_u8arry(&buf[pac_idx]);                          // W for regulate
-            m_inv_meter.invdata.e_in_total = get_u32_from_u8arry(&buf[etl_in_idx]) * 100;  // 0.01kwh  //
-            m_inv_meter.invdata.e_out_total = get_u32_from_u8arry(&buf[etl_ou_idx]) * 100; // 0.01kwh //
-            m_inv_meter.invdata.qac = get_u32_from_u8arry(&buf[qac_idx]);                  //
-            m_inv_meter.invdata.sac = get_u32_from_u8arry(&buf[sac_idx]);                  //
-            m_inv_meter.invdata.cosphi = get_u16_from_u8arry(&buf[pf_idx]) * 100;          // 0.01
-            m_inv_meter.invdata.fac = get_u16_from_u8arry(&buf[19]) * 100;                 // 0.01 Hz
-            meter_real_factory = get_u16_from_u8arry(&buf[pf_idx]) * 10000;                // 0.0001,pf
-
-            ASW_LOGI(" pac:%d,e_total:%d,e_out_total:%d,qac:%d,sac:%d,cos:%d,fac:%d,\n",
-                     m_fast_read_pac, m_inv_meter.invdata.e_in_total, m_inv_meter.invdata.e_out_total,
-                     m_inv_meter.invdata.qac, m_inv_meter.invdata.sac, m_inv_meter.invdata.cosphi, m_inv_meter.invdata.fac);
+        else if (type == 11) //增加类型11
+        {                    //增加类型11
+            // printf("decodeing AISWEI-INV-METER");                                                //增加类型11
+            /** modbus长度错误检查*/ //增加类型11
+            // int reg_num = meter_pro[7][1];                                                       //增加类型11
+            //增加类型11
+            uint16_t pac_idx = 3 + 2 * meter_pro[7][2];                                   // index of the ac power                       //增加类型11
+            uint16_t etl_in_idx = 3 + 2 * meter_pro[7][3];                                // index of the total energy input             //增加类型11
+            uint16_t etl_ou_idx = 3 + 2 * meter_pro[7][4];                                // index of the total energy output            //增加类型11
+            uint16_t qac_idx = 3 + 2 * meter_pro[7][5];                                   // index of the reactive power                 //增加类型11
+            uint16_t sac_idx = 3 + 2 * meter_pro[7][6];                                   // index of the apparent power                 //增加类型11
+            uint16_t pf_idx = 3 + 2 * meter_pro[7][7];                                    // index of the power factor                   //增加类型11
+                                                                                         //增加类型11
+            m_inv_meter.invdata.pac = get_u32_from_u8arry(&buf[pac_idx]);                  // W for cloud              //增加类型11
+            m_fast_read_pac = get_u32_from_u8arry(&buf[pac_idx]);                        // W for regulate           //增加类型11
+            m_inv_meter.invdata.e_in_total = get_u32_from_u8arry(&buf[etl_in_idx]) * 100;  // 0.01kwh  //增加类型11
+            m_inv_meter.invdata.e_out_total = get_u32_from_u8arry(&buf[etl_ou_idx]) * 100; // 0.01kwh //增加类型11
+            m_inv_meter.invdata.qac = get_u32_from_u8arry(&buf[qac_idx]);                  //增加类型11
+            m_inv_meter.invdata.sac = get_u32_from_u8arry(&buf[sac_idx]);                  //增加类型11
+            m_inv_meter.invdata.cosphi = get_u16_from_u8arry(&buf[pf_idx]) * 100;          // 0.01             //增加类型11
+            m_inv_meter.invdata.fac = get_u16_from_u8arry(&buf[19]) * 100;                 // 0.01 Hz          //增加类型11
+            meter_real_factory = get_u16_from_u8arry(&buf[pf_idx]) * 10000;              // 0.0001,pf            //增加类型11
         }
+        
 
 #endif
     }
@@ -297,7 +355,7 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
     {
         // Eng.Stg.Mch-lanstick 20220908 +
 #if TRIPHASE_ARM_SUPPORT
-        if (type <= 6 || type == 11) //
+        if (type <= 6 || type == 11) //增加类型11
 
 #else
         if (type <= 6)
@@ -319,9 +377,9 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
                 // inv_meter.invdata.pac = get_f32_from_u16(input_reg, pac_idx); //W
                 m_fast_read_pac = get_f32_from_u16(input_reg, pac_idx); // W
                 m_inv_meter.invdata.pac = m_fast_read_pac;
-                // #if DEBUG_PRINT_ENABLE
-                ASW_LOGI("----[tgl debug print]--------  -1- fast read pac:%d\n", m_fast_read_pac);
-                // #endif
+#if DEBUG_PRINT_ENABLE
+                printf("\n-----[tgl debug print]--------\n  -1- fast read pac:%d\n", m_fast_read_pac);
+#endif
             }
             else if (type == 6)
             {
@@ -340,19 +398,14 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
             g_start_addr = 0x0D;
             m_inv_meter.invdata.pac = (int)get_i16_from_res_frame(0x0D, buf); // W ----------------- regulate
         }
-        ASW_LOGI("pac: %d [W]\n", (int)m_inv_meter.invdata.pac);
+        ESP_LOGI(TAG, "pac: %d [W]\n", (int)m_inv_meter.invdata.pac);
     }
-
-    //----------------------------------------------------//
-    //电表数据读取时间
-    char timeRdMeter[32] = {0};
-    get_time(timeRdMeter, sizeof(timeRdMeter));
-    fileter_time(timeRdMeter, m_inv_meter.invdata.time);  
 
     /************************* 计算当日买卖电量 ****************************************/
 
     write_global_var(GLOBAL_METER_DATA, &m_inv_meter);
-
+    // Eng.Stg.Mch-lanstick 20220908 +-
+    //  if (!(frame_order == 2 && type == METER_ACREL_ADL200))
     if (is_fast == 1) /** 如果没有读到总买卖电量*/
     {
         return ASW_OK;
@@ -385,7 +438,9 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
     }
     else if (get_current_days() != gendata.day)
     {
-
+        // save_days();
+        // save_meter_etotal(inv_meter.invdata.e_total);
+        // save_meter_htotal(m_inv_meter.invdata.h_total);
         memset(&gendata, 0, sizeof(meter_gendata));
         gendata.e_in_total = m_inv_meter.invdata.e_in_total;
         gendata.e_out_total = m_inv_meter.invdata.e_out_total;
@@ -416,10 +471,10 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
         last_day = get_current_days();
     }
 
-    ASW_LOGI("e_in_today: %u [0.01kwh]\n", m_inv_meter.invdata.e_in_today);
-    ASW_LOGI("e_out_today: %u [0.01kwh]\n", m_inv_meter.invdata.e_out_today);
-    ASW_LOGI("e_in_day_begin: %u [0.01kwh]\n", m_inv_meter.e_in_day_begin);
-    ASW_LOGI("e_out_day_begin: %u [0.01kwh]\n", m_inv_meter.e_out_day_begin);
+    ESP_LOGI(TAG, "e_in_today: %u [0.01kwh]\n", m_inv_meter.invdata.e_in_today);
+    ESP_LOGI(TAG, "e_out_today: %u [0.01kwh]\n", m_inv_meter.invdata.e_out_today);
+    ESP_LOGI(TAG, "e_in_day_begin: %u [0.01kwh]\n", m_inv_meter.e_in_day_begin);
+    ESP_LOGI(TAG, "e_out_day_begin: %u [0.01kwh]\n", m_inv_meter.e_out_day_begin);
 
     write_global_var(GLOBAL_METER_DATA, &m_inv_meter);
 
@@ -429,7 +484,7 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
         if (mq2 != NULL)
         {
             xQueueSend(mq2, (void *)&m_inv_meter, (TickType_t)0);
-            ASW_LOGI("meter data send cld ok\n");
+            ESP_LOGI(TAG, "meter data send cld ok\n");
         }
         // msgsnd(meter_msg_id, &trans_meter_cloud, sizeof(trans_meter_cloud.data), IPC_NOWAIT);
         return ASW_OK;
@@ -438,3 +493,43 @@ int8_t md_decode_meter_pack(char is_fast, uint8_t type, uint8_t *buf, uint16_t l
     else
         return ASW_OK;
 }
+
+#if 0
+    // /** Total system power */
+        // tmp = (input_reg[pac_idx] << 16) + input_reg[pac_idx + 1];
+        // f_tmp = u32_to_float(tmp);
+        // // W --------------------------------- regulate
+        // m_inv_meter.invdata.pac = (uint32_t)f_tmp; // [tgl mark] 此处应该是有符号还是无符号？？？
+        // // printf("--------meter power:%04X, %d\r\n",tmp,inv_ptr->data.pac);
+
+        // /** Total Input Energy */
+        // tmp = (input_reg[etl_in_idx] << 16) + input_reg[etl_in_idx + 1];
+        // f_tmp = u32_to_float(tmp);
+        // m_inv_meter.invdata.e_in_total = (uint32_t)(f_tmp * 10);
+        // // printf("--------meter energy input:%04X, %d\r\n",tmp,inv_ptr->data.pdc);
+
+        // /** Total Output Energy */
+        // tmp = (input_reg[etl_ou_idx] << 16) + input_reg[etl_ou_idx + 1];
+        // f_tmp = u32_to_float(tmp);
+        // m_inv_meter.invdata.e_out_total = (uint32_t)(f_tmp * 10);
+        // // printf("--------meter energy output:%04X, %d\r\n",tmp,inv_ptr->data.sac);
+
+        // /** reactive power */
+        // tmp = (input_reg[qac_idx] << 16) + input_reg[qac_idx + 1];
+        // f_tmp = u32_to_float(tmp);
+        // m_inv_meter.invdata.qac = (uint32_t)(f_tmp); // [tgl mark] 此处应该是有符号还是无符号？？？
+        // // printf("--------meter reactive power:%04X, %d\r\n",tmp,inv_ptr->data.e_total);
+
+        // /** apparent power*/
+        // tmp = (input_reg[sac_idx] << 16) + input_reg[sac_idx + 1];
+        // f_tmp = u32_to_float(tmp);
+        // m_inv_meter.invdata.sac = (uint32_t)(f_tmp); // [tgl mark] 此处应该是有符号还是无符号？？？
+        // // printf("--------meter apparent power:%04X, %d\r\n",tmp,inv_ptr->data.h_total);
+
+        // /** power factor*/
+        // tmp = (input_reg[pf_idx] << 16) + input_reg[pf_idx + 1];
+        // f_tmp = u32_to_float(tmp);
+        // m_inv_meter.invdata.cosphi = (uint32_t)(f_tmp); // [tgl mark] 此处应该是有符号还是无符号？？？
+        // // printf("--------meter power factor:%04X, %d\r\n",tmp,inv_ptr->data.e_today);
+
+#endif

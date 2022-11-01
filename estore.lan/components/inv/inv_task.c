@@ -67,6 +67,7 @@ void inv_task(void *pvParameters)
             break;
 #endif
         default:
+
             task_state = TASK_IDLE;
             break;
         }

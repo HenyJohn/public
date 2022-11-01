@@ -21,6 +21,18 @@ void send_inv_cld_status_check(void)
 
     if (last_status != curr_status)
     {
+
+        // MARK TODO change to broadcast or host inv.
+        //  for (uint8_t j = 0; j < INV_NUM; j++)
+        //  {
+
+        //     if (inv_arr[j].status && inv_arr[j].regInfo.mach_type > 10) // estore && online
+        //     {
+        //         printf("--inv index: %d cld status changed, send it\n", j);
+        //         task_inv_msg_arr[j] |= MSG_DSP_ZV_CLD_INDEX; /** 仅限储能机,告知逆变器MQTT状态*/
+        //     }
+        // }
+
         g_task_inv_broadcast_msg |= MSG_BRDCST_DSP_ZV_CLD_INDEX;
         last_status = curr_status;
     }

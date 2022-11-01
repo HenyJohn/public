@@ -33,8 +33,8 @@ int8_t g_state_ethernet_connect = -1; //-1 初始状态; 0: 连接断开 ; 1: �
 #define CONFIG_APSTA_AP_SSID "AISWEI-8888"
 #define CONFIG_APSTA_AP_PASSWORD "12345678"
 
-#define CONFIG_APSTA_STA_SSID "11111111"          // 32
-#define CONFIG_APSTA_STA_PASSWORD "2222222222222" // 32
+#define CONFIG_APSTA_STA_SSID "11111111"  //32
+#define CONFIG_APSTA_STA_PASSWORD "2222222222222"  //32
 
 //======== V2.0.0 add ===============//
 #define DEFAULT_SCAN_LIST_SIZE 25
@@ -965,7 +965,6 @@ static void start_webserver(void)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 4096 * 2;
     config.server_port = 8484;
-    config.recv_wait_timeout = 30; /// tgl mark for W (xxxxx) httpd_txrx: httpd_sock_err: error in recv : 11” erro
     //-----------<<<
     // Start the httpd server
     ESP_LOGW(TAG, "Starting server on port: '%d'", config.server_port);
@@ -995,6 +994,7 @@ static void eth_net_start(void)
     // Warning: the interface desc is used in tests to capture actual connection details (IP, gw, mask)
     asprintf(&desc, "%s: %s", TAG, esp_netif_config.if_desc);
 
+    // ASW_LOGW("TGL_DEBUG_PRINT, desc:%s", desc);
     esp_netif_config.if_desc = desc;
     esp_netif_config.route_prio = 200; // Lan eth 优先级 > wifi-sta
     esp_netif_config_t netif_config = {
@@ -1029,10 +1029,10 @@ static void eth_net_start(void)
     xEventGroupSetBits(s_net_mode_group, ETH_MODE_BIT);
 
     int route_prio = esp_netif_get_route_prio(s_asw_esp_netif);
-    // #if DEBUG_PRINT_ENABLE
-    ASW_LOGI("====================== \n Lan ETH route prio:%d\n=====================\n", route_prio);
-    // #endif
-    ESP_LOGI(TAG, " ETH NET INIT Finished!!");
+#if DEBUG_PRINT_ENABLE
+    printf("\n======================= \n Lan ETH route prio:%d\n=====================\n", route_prio);
+#endif
+    ASW_LOGW(" ETH NET INIT Finished!!");
 }
 
 //-----------------------------------------//
@@ -1168,6 +1168,7 @@ static void asw_wifi_sta_mode()
 
     if (strlen((char *)sta_para.ssid) > 0) //[mark]会运行到这里吗？？？
     {
+
         memcpy(wifi_sta_config.sta.ssid, sta_para.ssid, sizeof(sta_para.ssid));             //[mark] strlen -> sizeof
         memcpy(wifi_sta_config.sta.password, sta_para.password, sizeof(sta_para.password)); //[mark] strlen -> sizeof
     }
@@ -1181,8 +1182,10 @@ static void asw_wifi_sta_mode()
     ESP_LOGE(TAG, " WIFI STA,ssid:%s,password:%s \n", wifi_sta_config.sta.ssid, wifi_sta_config.sta.password);
 
     int route_prio = esp_netif_get_route_prio(netif_wifiSTA);
+#if DEBUG_PRINT_ENABLE
 
-    ESP_LOGI(TAG, "\n======================= \n WIFI STA route prio:%d\n=====================\n", route_prio);
+    printf("\n======================= \n WIFI STA route prio:%d\n=====================\n", route_prio);
+#endif
     esp_wifi_start();
 }
 

@@ -56,6 +56,7 @@ int restore_ap(void)
         wifi_ap_para_t ap_para_tmp = {0};
         general_query(NVS_AP_PARA, &ap_para_tmp);
 
+        // ESP_LOGW("==== TGL DEBUG ====","restore ap ps :%s",(char *)ap_para_tmp.password);
         memcpy(_ap_para.password, ap_para_tmp.password, sizeof(ap_para_tmp.password)); //[tgl mark] strlen->sizof
 
         general_add(NVS_AP_PARA, &_ap_para);
@@ -81,12 +82,6 @@ void factory_reset_nvs()
     general_delete(NVS_NET_STATIC_INFO);
 
     general_delete(NVS_METER_CONTROL);
-
-    //////////////////////////////
-    ///  添加 初始化电池配置及调度信息 待验证
-    general_delete(NVS_CONFIG);
-    general_delete(NVS_SCHED_BAT);
-    ///////////////////////////
 }
 
 //------------------------------------//
@@ -402,7 +397,7 @@ int8_t get_device_sn(void)
 
     if (strlen(para.psn) > 0)
     {
-        ASW_LOGI( "first get psn %s \n", para.psn);
+        ESP_LOGI(TAG, "first get psn %s \n", para.psn);
         return ASW_OK;
     }
 

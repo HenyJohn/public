@@ -103,7 +103,7 @@ TDCEvent gettime(void)
     sn_to_reg(DEMO_DEVICE_NAME, reg_key);
 
     sprintf(time_url, "http://mqtt.aisweicloud.com/api/v1/updatetime?psno=%s&sign=%s", DEMO_DEVICE_NAME, reg_key);
-    ASW_LOGI("timeurl %s\n", time_url);
+    ESP_LOGI(TAG, "timeurl %s\n", time_url);
     int ret = http_get_time(time_url, &ptime);
 
     if (ret != 0)
@@ -127,33 +127,33 @@ TDCEvent gettime(void)
             sent_newmsg();
         }
 
-        ESP_LOGW("--GetTime--","gettime error\r\n");
+        printf("gettime error\r\n");
         return dcIdle;
     }
     else if (ptime.tm_year > 2019 && ptime.tm_year < 2050)
     {
         ptime.tm_year -= 1900;
         ptime.tm_mon -= 1;
-        ASW_LOGI("[year] %d\n", ptime.tm_year);
-        ASW_LOGI("[mon] %d\n", ptime.tm_mon);
-        ASW_LOGI("[day] %d\n", ptime.tm_mday);
-        ASW_LOGI("[hour] %d\n", ptime.tm_hour);
-        ASW_LOGI("[min] %d\n", ptime.tm_min);
-        ASW_LOGI("[sec] %d\n", ptime.tm_sec);
+        ESP_LOGI(TAG, "[year] %d\n", ptime.tm_year);
+        ESP_LOGI(TAG, "[mon] %d\n", ptime.tm_mon);
+        ESP_LOGI(TAG, "[day] %d\n", ptime.tm_mday);
+        ESP_LOGI(TAG, "[hour] %d\n", ptime.tm_hour);
+        ESP_LOGI(TAG, "[min] %d\n", ptime.tm_min);
+        ESP_LOGI(TAG, "[sec] %d\n", ptime.tm_sec);
 
         tv.tv_sec = mktime(&ptime);
         settimeofday(&tv, NULL);
         // system("hwclock -w");
         // system("sync");
         sprintf(ts, "date %02d%02d%02d%02d%d", (ptime.tm_mon + 1), ptime.tm_mday, ptime.tm_hour, ptime.tm_min, (ptime.tm_year + 1900));
-        ASW_LOGI("set time %s \n", ts);
+        ESP_LOGI(TAG, "set time %s \n", ts);
         system(ts);
         system("sync");
 
         // display time we have set
         char display[20] = {0};
         get_time(display, 20);
-        ASW_LOGI("system time: %s\n", display);
+        ESP_LOGI(TAG, "system time: %s\n", display);
         // pthread_mutex_lock(&monitor_mutex);
         g_monitor_state |= SYNC_TIME_FROM_CLOUD_INDEX;
         // pthread_mutex_unlock(&monitor_mutex);
@@ -183,38 +183,38 @@ int get_time_manual(void)
     sn_to_reg(DEMO_DEVICE_NAME, reg_key);
 
     sprintf(time_url, "http://mqtt.aisweicloud.com/api/v1/updatetime?psno=%s&sign=%s", DEMO_DEVICE_NAME, reg_key);
-    ASW_LOGI("[ url ] :\n%s\n", time_url);
+    printf("[ url ] :\n%s\n", time_url);
     int ret = http_get_time(time_url, &ptime);
     if (ret != 0)
     {
-        ASW_LOGW("gettime error\n");
+        printf("gettime error\n");
         return -1;
     }
     else if (ptime.tm_year > 2019 && ptime.tm_year < 2070)
     {
         ptime.tm_year -= 1900;
         ptime.tm_mon -= 1;
-
-        ASW_LOGI("[year] %d\n", ptime.tm_year);
-        ASW_LOGI("[mon] %d\n", ptime.tm_mon);
-        ASW_LOGI("[day] %d\n", ptime.tm_mday);
-        ASW_LOGI("[hour] %d\n", ptime.tm_hour);
-        ASW_LOGI("[min] %d\n", ptime.tm_min);
-        ASW_LOGI("[sec] %d\n", ptime.tm_sec);
-
+#if DEBUG_PRINT_ENABLE
+        printf("[year] %d\n", ptime.tm_year);
+        printf("[mon] %d\n", ptime.tm_mon);
+        printf("[day] %d\n", ptime.tm_mday);
+        printf("[hour] %d\n", ptime.tm_hour);
+        printf("[min] %d\n", ptime.tm_min);
+        printf("[sec] %d\n", ptime.tm_sec);
+#endif
         tv.tv_sec = mktime(&ptime);
         settimeofday(&tv, NULL);
         // system("hwclock -w");
         // system("sync");
         sprintf(ts, "date %02d%02d%02d%02d%d", (ptime.tm_mon + 1), ptime.tm_mday, ptime.tm_hour, ptime.tm_min, (ptime.tm_year + 1900));
-        ASW_LOGI("set time %s \n", ts);
+        printf("set time %s \n", ts);
         system(ts);
         system("sync");
         return 0;
     }
     else
     {
-        ESP_LOGW(TAG,"gettime ok but year error\n");
+        printf("gettime ok but year error\n");
         return -1;
     }
 }
@@ -246,7 +246,7 @@ int cloud_setup(void)
     Setting_Para para = {0};
     general_query(NVS_ATE, &para);
 
-    ASW_LOGI("\n**DEBUG_PRINT:host,%s\n", para.host);
+    printf("\n**DEBUG_PRINT:host,%s\n", para.host);
 
     set_mqtt_server(para.product_key, para.host, para.port);
     // set_mqtt_server(para.host, para.port);
@@ -268,7 +268,7 @@ int cloud_setup(void)
     }
     else
     {
-        ESP_LOGW(TAG, "[ err ] mqtt connect >>>>>>>\n");
+        ESP_LOGI(TAG, "[ err ] mqtt connect >>>>>>>\n");
     }
 
     return 0;
@@ -293,7 +293,7 @@ int mqtt_connect(void)
     {
         connect_stage = 2;
 
-        ASW_LOGI("\n=====DEBUG PRIntf ====\n=====eth connect status:%d,wifi connect status:%d=======   conncet stage :%d ============\n",
+        printf("\n=====DEBUG PRIntf ====\n=====eth connect status:%d,wifi connect status:%d=======   conncet stage :%d ============\n",
                get_eth_connect_status(), get_wifi_sta_connect_status(), connect_stage);
         return dcalilyun_publish;
     }
@@ -390,10 +390,10 @@ static void mqtt_msg1_syncpmu_state_fun(char *payload)
             ap_para_tmp.password,
             mt.is_parallel == 1 ? "1" : "0",
             mt.ssc_enable == 1 ? "1" : "0");
-    ASW_LOGI("PUB MONITOR INFO %s **********************\n", payload);
+    ESP_LOGI(TAG, "PUB MONITOR INFO %s **********************\n", payload);
     if (asw_publish(payload /*, pcout++*/) >= 0)
     {
-        ASW_LOGI("[ asw_publish ] pmu info\n");
+        ESP_LOGI(TAG, "[ asw_publish ] pmu info\n");
         g_monitor_state |= INV_SYNC_PMU_STATE;
     }
 }
@@ -408,8 +408,8 @@ int mqtt_publish(char *json_msg)
 
     if (g_num_real_inv <= 0)
     {
-        ASW_LOGI("\n-------mqtt_publish------\n  ");
-        ASW_LOGI(" the inv num is 0 .\n");
+        printf("\n-------mqtt_publish------\n  ");
+        printf(" the inv num is 0 .\n");
         goto END;
     }
 
@@ -439,7 +439,10 @@ int mqtt_publish(char *json_msg)
         if (get_second_sys_time() - publish_fail_time > 200) // 200
         {
             publish_fail_time = get_second_sys_time();
+#if DEBUG_PRINT_ENABLE
 
+            printf("\n============== mqtt_client_destroy_free will be called =AAAAAAAA============= \n");
+#endif
             mqtt_client_destroy_free();
             return dcalilyun_authenticate;
         }
@@ -468,8 +471,8 @@ int mqtt_publish(char *json_msg)
             if (strlen(devicedata.sn) > 0)
             {
 
-                ASW_LOGI("\n-------mqtt_publish------\n  ");
-                ASW_LOGI(" the mach type:%d\n", devicedata.mach_type); // Eng.Stg.Mch-lanstick
+                printf("\n-------mqtt_publish------\n  ");
+                printf(" the mach type:%d\n", devicedata.mach_type); // Eng.Stg.Mch-lanstick
                 if (devicedata.mach_type >= 11)                      /** 是储能机*/
                 {
                     get_estore_invinfo_payload(devicedata, payload);
@@ -513,12 +516,12 @@ int mqtt_publish(char *json_msg)
                             devicedata.modbus_id);
                     ////////////////////////////////////////////////////////
                 }
-                ASW_LOGI("PUB  %s inv info**************\n", payload);
+                ESP_LOGI(TAG, "PUB  %s inv info**************\n", payload);
 
                 if (asw_publish(payload) > -1)
                 {
                     inv_info_sync[inv_sync_num] = 1;
-                    ASW_LOGI("[ asw_publish ] %d inv info\n", inv_sync_num);
+                    ESP_LOGI(TAG, "[ asw_publish ] %d inv info\n", inv_sync_num);
                 }
                 else
                 {
@@ -532,7 +535,7 @@ int mqtt_publish(char *json_msg)
             else
             {
                 // inv_info_sync[inv_sync_num] = 1;
-                ESP_LOGW(TAG, "############%s--SN ERROR isn't 16 numerics or letters\n", devicedata.sn);
+                ESP_LOGI(TAG, "############%s--SN ERROR isn't 16 numerics or letters\n", devicedata.sn);
             }
 
             inv_sync_num++;
@@ -548,20 +551,22 @@ int mqtt_publish(char *json_msg)
                 if (1 == inv_info_sync[i])
                 {
                     j++;
-                    ASW_LOGI("rht %d %dinvter info upload\n", i, j);
+                    ESP_LOGI(TAG, "rht %d %dinvter info upload\n", i, j);
                 }
             }
 
             if (j && j >= g_num_real_inv)
             {
-                ASW_LOGI("all invter info upload\n");
+                ESP_LOGI(TAG, "all invter info upload\n");
                 inv_info_sync[29] = 1;
             }
         }
     }
     memset(payload, 0, sizeof(payload));
 
-
+#if DEBUG_PRINT_ENABLE
+    printf("\n-------------  22222222  [%d]---------\n", monitor_para.adv.meter_enb);
+#endif
     // if (monitor_para.adv.meter_enb!= 0 && g_meter_sync == 0)  //[tgl mark add 電表狀態發生改變，同步信息]
     if (monitor_para.adv.meter_enb != state_meter_last || g_meter_sync == 0)
     {
@@ -607,7 +612,7 @@ int mqtt_publish(char *json_msg)
     /** 实时数据*/
     if (strlen(json_msg) > 0)
     {
-        ASW_LOGI("payload++=   %s\n", json_msg);
+        printf("payload++=   %s\n", json_msg);
         memcpy(this_msg, json_msg, strlen(json_msg));
     }
     else
@@ -625,17 +630,17 @@ int mqtt_publish(char *json_msg)
         {
             if (pub_res == get_mqtt_pub_ack())
             {
-                ASW_LOGI("read ack %d \n", pub_res);
+                printf("read ack %d \n", pub_res);
                 chk_res = 1;
                 break;
             }
             usleep(20 * 1000);
         }
-        ASW_LOGI("time leasp %lld pub ack %d %d \n", (get_second_sys_time() - read_pub_ack_time), pub_res, get_mqtt_pub_ack());
+        printf("time leasp %lld pub ack %d %d \n", (get_second_sys_time() - read_pub_ack_time), pub_res, get_mqtt_pub_ack());
 
         if (chk_res == 1)
         {
-            ASW_LOGI("publish succeful ncout:%d\r\n", ncout++);
+            printf("publish succeful ncout:%d\r\n", ncout++);
             if (ncout > 32766)
                 ncout = 0;
 
@@ -648,14 +653,14 @@ int mqtt_publish(char *json_msg)
                 hist_offset_next(); /** 发成功的是历史数据，指向下一个*/
             }
 
-            ASW_LOGI("publish inv data ok\n");
+            printf("publish inv data ok\n");
             publish_fail = 0;
             // pcout++;
             netework_state = 0;
         }
         else
         {
-            ESP_LOGW(TAG,"publish data fail\n");
+            printf("publish data fail\n");
             // write_to_log("publish invinfo faild");
             if (!publish_fail)
                 publish_fail_time = esp_timer_get_time();
@@ -665,7 +670,7 @@ int mqtt_publish(char *json_msg)
             {
                 // write_to_log("publish faild 3 mins exit");
                 // exit(-3);
-                ESP_LOGW(TAG,"============== mqtt_client_destroy_free will be called ==============");
+                printf("\n============== mqtt_client_destroy_free will be called ============== \n");
                 mqtt_client_destroy_free();
                 return dcalilyun_authenticate;
             }
@@ -695,7 +700,7 @@ int trans_resrrpc_pub(cloud_inv_msg *resp, unsigned char *ws, int len) //[tgl ma
 
     if (0 != asw_mqtt_publish(rrpc_res_topic, (char *)payload, strlen(payload), 0)) // res scan(payload))
     {
-        ESP_LOGW(TAG,"[err] publish trans resp\n");
+        printf("[err] publish trans resp\n");
 
         return -1;
     }

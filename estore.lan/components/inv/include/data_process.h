@@ -564,7 +564,7 @@ typedef struct
 #define MSG_WRT_STA_INFO_INDEX 0x0010        ///< uesed to inform inv_com task update the sechdule immediately
 #define MSG_WRT_SET_HOST_INDEX 0x0020        ///< uesed to inform inv_com task to set addr to host
 #define MSG_BRDCST_DSP_ZV_CLD_INDEX 0x0040   ///< uesed to inform inv_com task to send cloud status to inv
-#define MSG_BRDCST_CHARGE_INDEX 0x0080   ///< uesed to inform inv_com task to send charge/discharge battery
+
 //----- inv register add ----------
 #define INV_REG_ADDR_SSID_PSSWD 0X0484   // register address 41157 ssid
 #define INV_REG_ADDR_SET_HOST 0X045C     // register address 41117 主从机设置

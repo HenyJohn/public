@@ -2,8 +2,6 @@
 #include "data_process.h"
 #include "asw_nvs.h"
 
-const char *TAG = "asw_mutex.c";
-
 #define SEMA_NUM 10
 static SemaphoreHandle_t sema[SEMA_NUM] = {NULL};
 MonitorPara g_meter_monitor_para = {0};
@@ -44,7 +42,9 @@ void private_memcpy(void *des, void *src, int type_semaIndex, int is_write_nvs)
             {
                 int res = general_add(NVS_CONFIG, src);
 
-                ASW_LOGI(" PARA_CONFIG  general_add  NVS_CONFIG  res:%d", res);
+                printf("\n==========  debug  private_memcpy ==========\n");
+                printf(" PARA_CONFIG  general_add  NVS_CONFIG  res:%d", res);
+                printf("\n==========  debug  private_memcpy ==========\n");
             }
             break;
 
@@ -182,11 +182,11 @@ void load_global_var(void)
     int res = 0;
     res = general_query(NVS_METER_CONTROL, &g_meter_monitor_para);
 
-    ESP_LOGI("-load_global_var-", "---------  read  NVS_METER_CONTROL res:%d-------\n", res);
+    printf("\n----------  read  NVS_METER_CONTROL res:%d-------\n", res);
 
     if (res != 0)
     {
-        ESP_LOGI("-load_global_var-", "===========   load defualt to NVS_METER_CONTROL ==========");
+        printf("\n===========   load defualt to NVS_METER_CONTROL ==========\n");
 
         /** 默认设置：如果从flash读取失败*/
         /** Ethernet*/
@@ -221,7 +221,7 @@ void load_global_var(void)
     res = general_query(NVS_CONFIG, &g_monitor_para);
     if (res != 0)
     {
-        ESP_LOGI("-load_global_var-", "===========   load defualt to NVS CONFIG ==========");
+        printf("\n===========   load defualt to NVS CONFIG ==========\n");
         for (uint8_t i = 0; i < INV_NUM; i++)
         {
             /** battery schedule*/
@@ -290,48 +290,6 @@ void load_global_var(void)
         }
     }
 #endif
-
-    if (g_parallel_enable == 0)
-    {
-        uint8_t i = 0, j = 0;
-        for (i = 0; i < INV_NUM; i++)
-        {
-            if (g_monitor_para[i].modbus_id < 3)
-            {
-                break;
-                j = i;
-            }
-
-            if (g_monitor_para[i].batmonitor.uu1 != 4 || g_monitor_para[i].batmonitor.dc_per != 1)
-            {
-                break;
-            }
-        }
-
-        if (i == j)
-            g_battery_selfmode_is_same = 1;
-        else
-            g_battery_selfmode_is_same = 0;
-    }
-    else if (g_parallel_enable == 1)
-    {
-
-        for (uint8_t i = 0; i < INV_NUM; i++)
-        {
-            if (g_monitor_para[i].modbus_id < 3)
-                break;
-            if (g_monitor_para[i].modbus_id == g_host_modbus_id)
-            {
-                if (g_monitor_para[i].batmonitor.uu1 == 4 && g_monitor_para[i].batmonitor.dc_per == 1)
-                {
-                    g_battery_selfmode_is_same = 1;
-                }
-            }
-        }
-    }
-
-    ESP_LOGI("-- Load Sys Info --", "the g_battery_selfmode_is_same:%d,g_parallel_enable:%d, g_host_modbus_id:%d\n",
-             g_battery_selfmode_is_same, g_parallel_enable, g_host_modbus_id);
 }
 
 /** special api******************************************************/

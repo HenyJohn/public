@@ -29,13 +29,13 @@ void task_ate_create();
 void task_inv_create();
 void task_cloud_create();
 void task_led_create();
-void print_meminfo_task();
+void print_meminfo_task(); //[tgl mem]debug
 
-uint8_t g_asw_debug_enable = 0;
+bool g_asw_debug_enable = 1;
 
 bool g_net_connnect_flag = false; //网络连接状态   0-连接断开;1-连接正常
 bool g_ap_connnect_flag = false;  // AP连接状态   0-连接断开;1-连接正常
-bool g_asw_static_ip_enable = 0;
+bool g_asw_static_ip_enable = 0; 
 bool g_meter_inv_synupload_flag = 0;
 int64_t g_uint_meter_data_time; //逆变器和电表数据上传同步 < 10s
 
@@ -45,8 +45,6 @@ uint8_t g_ssc_enable;
 
 uint8_t g_parallel_enable = 99; //并机模式 1-打开 0-关闭
 uint8_t g_host_modbus_id = 3;   //并机模式下主机modbus id
-bool g_safety_is_96_97 = 0;
-bool g_battery_selfmode_is_same=0;  
 
 // char g_p2p_mode = 0 ;
 //===================================//
@@ -182,9 +180,9 @@ void print_meminfo_task()
     {
         ASW_LOGE("mem free has %dKiB.", esp_get_free_heap_size() / 1024);
 
-        ESP_LOGW("Stick Run Mode", " [%d] 0:IDLE,1:AP-Prov,2:WIFI-STA,3:LAN ,lan-status:%d ,cloud-status:%d",
-                 g_stick_run_mode, get_eth_connect_status(), g_state_mqtt_connect);
-
+        ESP_LOGW("Stick Run Mode", " [%d] 0:IDLE,1:AP-Prov,2:WIFI-STA,3:LAN ,lan-status:%d ,cloud-status:%d", 
+        g_stick_run_mode, get_eth_connect_status(), g_state_mqtt_connect);
+        
         vTaskList((char *)&InfoBuffer);
         ASW_LOGW("|任务状态|优先级|剩余栈|任务序号\r\n");
         printf("\r\n%s\r\n", InfoBuffer);

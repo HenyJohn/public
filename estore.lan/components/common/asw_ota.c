@@ -45,7 +45,7 @@ void asw_ota_start(void *pvParameter)
 
     esp_http_client_config_t config = {
         .url = (char *)pvParameter,
-        .cert_pem = NULL, //(char *)server_cert_pem_start,        
+        .cert_pem = NULL, //(char *)server_cert_pem_start,
         .event_handler = _http_event_handler,
     };
 
