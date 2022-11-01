@@ -14,6 +14,7 @@
 #include "Asw_global.h"
 #include "data_process.h"
 #include "inv_com.h"
+#include "http_client.h"
 #include "asw_ota.h"
 #include "asw_mqtt.h"
 //----------------------------//

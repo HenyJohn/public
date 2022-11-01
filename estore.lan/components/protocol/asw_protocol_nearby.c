@@ -81,7 +81,8 @@ static char *getdev_handle_type_1_fun()
 
     //--\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\-//
     if (miSetHost)
-        cJSON_AddNumberToObject(res, "host", mt.is_parallel);
+        cJSON_AddNumberToObject(res, "parallel", mt.is_parallel);
+    cJSON_AddNumberToObject(res, "ssc", mt.ssc_enable);
 
     if (is_cgi_has_estore()) //储能机
     {
@@ -156,8 +157,7 @@ static char *getdev_handle_type_2_fun()
 #if PARALLEL_HOST_SET_WITH_SN
             if (strcmp(cgi_inv_arr[i].regInfo.sn, mt.host_psn) == 0)
 #else
-            // if (devicedata.modbus_id == mt.host_adr)
-            if (cgi_inv_arr[i].regInfo.modbus_id == mt.host_adr)
+            if (devicedata.modbus_id == mt.host_adr)
 #endif
                 host_status = 1;
             else
@@ -274,10 +274,6 @@ static char *getdev_handle_type_4_fun(char *psn)
     cJSON_AddNumberToObject(res, "discharge_max", monitor_para[index].batmonitor.dchg_max);
     cJSON_AddNumberToObject(res, "charge_max", monitor_para[index].batmonitor.chg_max);
 
-    /* tgl mark TODO DONE */
-    // cJSON_AddNumberToObject(res, "discharge_max", monitor_para.adv.freq_mode);
-    // cJSON_AddNumberToObject(res, "charge_max", monitor_para.adv.freq_mode);
-
     msgBuf = cJSON_PrintUnformatted(res);
 
     cJSON_Delete(res);
@@ -337,7 +333,9 @@ static char *getdev_handle_type_default_fun()
     //     miSetHost = 1;
     ///////////////////////////////////////////////////////////
     if (miSetHost)
-        cJSON_AddNumberToObject(res, "host", mt.is_parallel); // add for new
+        cJSON_AddNumberToObject(res, "parallel", mt.is_parallel); // add for new
+
+    cJSON_AddNumberToObject(res, "ssc", mt.ssc_enable); // add for new
 
     msg = cJSON_PrintUnformatted(res);
 
@@ -352,13 +350,12 @@ static char *getdevdata_handle_type_2_fun(char *inv_sn)
 
     for (i = 0; i < g_num_real_inv; i++)
     {
-#if DEBUG_PRINT_ENABLE
+        // #if DEBUG_PRINT_ENABLE
 
-        printf("\n==========get devdata debug========\n");
-        printf("current sn=%s\n", inv_sn);
-        printf(" sn[%d]=%s", i, cgi_inv_arr[i].regInfo.sn);
-        printf("\n==========get devdata debug========\n");
-#endif
+        ASW_LOGI("\n==========get devdata debug========\n");
+        ASW_LOGI("current sn=%s\n", inv_sn);
+        ASW_LOGI(" sn[%d]=%s", i, cgi_inv_arr[i].regInfo.sn);
+        // #endif
         if (strcmp(cgi_inv_arr[i].regInfo.sn, inv_sn) == 0)
             break;
     }
@@ -368,13 +365,11 @@ static char *getdevdata_handle_type_2_fun(char *inv_sn)
         ASW_LOGW("device not found");
         return NULL;
     }
-#if DEBUG_PRINT_ENABLE
+    // #if DEBUG_PRINT_ENABLE
 
-    printf("\n===========inv data print==============\n");
-    printf("cgi_inv_arr[%d].PV_cur_voltg[0].iVol=%d\n", i, cgi_inv_arr[i].invdata.PV_cur_voltg[0].iVol);
-    printf("\n===========inv data print==============\n");
+    ASW_LOGI("cgi_inv_arr[%d].PV_cur_voltg[0].iVol=%d\n", i, cgi_inv_arr[i].invdata.PV_cur_voltg[0].iVol);
 
-#endif
+    // #endif
     cJSON *res = cJSON_CreateObject();
 
     cJSON_AddNumberToObject(res, "flg", cgi_inv_arr[i].invdata.status);
@@ -474,18 +469,7 @@ static char *getdevdata_handle_type_3_fun()
     cJSON_AddNumberToObject(res, "mod", monitor_para.adv.meter_mod);
     // cJSON_AddNumberToObject(res, "mod", 100);
     cJSON_AddNumberToObject(res, "enb", monitor_para.adv.meter_enb);
-#if 0
-    cJSON_AddNumberToObject(res, "flg", g_inv_meter.invdata.status);
-    cJSON_AddStringToObject(res, "tim", g_inv_meter.invdata.time);
-    // printf("g_inv_meter.invdata.pac %d \n", g_inv_meter.invdata.pac);
-    cJSON_AddNumberToObject(res, "pac", (int)g_inv_meter.invdata.pac);
-    cJSON_AddNumberToObject(res, "itd", g_inv_meter.invdata.con_stu);
-    cJSON_AddNumberToObject(res, "otd", g_inv_meter.invdata.e_today);
-    cJSON_AddNumberToObject(res, "iet", g_inv_meter.invdata.e_total); // h_total);
-    cJSON_AddNumberToObject(res, "oet", g_inv_meter.invdata.h_total); // e_total);
-    cJSON_AddNumberToObject(res, "mod", g_merter_config.mod);
-    cJSON_AddNumberToObject(res, "enb", g_merter_config.enb);
-#endif
+
     msg = cJSON_PrintUnformatted(res);
 
     cJSON_Delete(res);
@@ -504,14 +488,14 @@ static char *getdevdata_handle_type_4_fun(char *inv_sn)
     read_global_var(GLOBAL_BATTERY_DATA, &mBattArray_data);
     for (i = 0; i < g_num_real_inv; i++)
     {
-#if DEBUG_PRINT_ENABLE
+        // #if DEBUG_PRINT_ENABLE
 
-        printf("\n==========get devdata debug handle ========\n");
-        printf("current sn=%s\n", inv_sn);
-        printf(" sn[%d]=%s", i, mBattArray_data[i].sn);
-        printf("\n==========get devdata debug handle========\n");
+        // printf("\n==========get devdata debug handle ========\n");
+        ASW_LOGI("current sn=%s\n", inv_sn);
+        ASW_LOGI(" sn[%d]=%s", i, mBattArray_data[i].sn);
+        // printf("\n==========get devdata debug handle========\n");
+        // #endif
 
-#endif
         if (strcmp(mBattArray_data[i].sn, inv_sn) == 0)
             break;
     }
@@ -645,26 +629,50 @@ static char *wlanget_handler_info_2_fun() //[tgl mark]TODO这段需要改为ethe
     char *msg = NULL;
     char *tmp;
 
-    tmp = get_ssid();
-    cJSON_AddStringToObject(res, "sid", tmp);
-    free(tmp);
-    cJSON_AddStringToObject(res, "DHCP", NULL);
-    cJSON_AddStringToObject(res, "mode", "STA");
+    if (g_stick_run_mode == Work_Mode_LAN)
+    {
+        cJSON_AddStringToObject(res, "mode", "LAN"); // tgl mark ethernet
 
-    cJSON_AddNumberToObject(res, "srh", get_rssi());
+        // cJSON_AddNumberToObject(res, "srh", 0); // TGL MARK TODO
 
-    if (strlen(my_sta_ip) > 0)
-        cJSON_AddStringToObject(res, "ip", my_sta_ip);
+        if (strlen(my_eth_ip) > 0)
+            cJSON_AddStringToObject(res, "ip", my_eth_ip);
+        else
+            cJSON_AddStringToObject(res, "ip", NULL);
 
-    if (strlen(my_sta_gw) > 0)
-        cJSON_AddStringToObject(res, "gtw", my_sta_gw);
-    else
-        cJSON_AddStringToObject(res, "gtw", NULL);
+        if (strlen(my_eth_gw) > 0)
+            cJSON_AddStringToObject(res, "gtw", my_eth_gw);
+        else
+            cJSON_AddStringToObject(res, "gtw", NULL);
 
-    if (strlen(my_sta_mk) > 0)
-        cJSON_AddStringToObject(res, "msk", my_sta_mk);
-    else
-        cJSON_AddStringToObject(res, "msk", NULL);
+        if (strlen(my_eth_mk) > 0)
+            cJSON_AddStringToObject(res, "msk", my_eth_mk);
+        else
+            cJSON_AddStringToObject(res, "msk", NULL);
+    }
+    else if (g_stick_run_mode == Work_Mode_STA)
+    {
+        tmp = get_ssid();
+        cJSON_AddStringToObject(res, "sid", tmp);
+        free(tmp);
+        cJSON_AddStringToObject(res, "DHCP", NULL);
+        cJSON_AddStringToObject(res, "mode", "STA");
+
+        cJSON_AddNumberToObject(res, "srh", get_rssi());
+
+        if (strlen(my_sta_ip) > 0)
+            cJSON_AddStringToObject(res, "ip", my_sta_ip);
+
+        if (strlen(my_sta_gw) > 0)
+            cJSON_AddStringToObject(res, "gtw", my_sta_gw);
+        else
+            cJSON_AddStringToObject(res, "gtw", NULL);
+
+        if (strlen(my_sta_mk) > 0)
+            cJSON_AddStringToObject(res, "msk", my_sta_mk);
+        else
+            cJSON_AddStringToObject(res, "msk", NULL);
+    }
 
     cJSON_AddStringToObject(res, "dns_a", NULL);
     cJSON_AddStringToObject(res, "dns", NULL);
@@ -681,8 +689,42 @@ static char *wlanget_handler_info_3_fun()
 
     // V2.0.0 change
 
-    cJSON_AddStringToObject(res, "mode", "AP");
+    // if (g_stick_run_mode == Work_Mode_AP_PROV)
+    //     cJSON_AddStringToObject(res, "mode", "AP");
+    // else if (g_stick_run_mode == Work_Mode_STA)
+    // {
+    //     cJSON_AddStringToObject(res, "mode", "STA");
+    //     if (strlen(my_sta_ip) > 0)
+    //         cJSON_AddStringToObject(res, "ip", my_sta_ip);
 
+    //     if (strlen(my_sta_gw) > 0)
+    //         cJSON_AddStringToObject(res, "gtw", my_sta_gw);
+    //     else
+    //         cJSON_AddStringToObject(res, "gtw", NULL);
+
+    //     if (strlen(my_sta_mk) > 0)
+    //         cJSON_AddStringToObject(res, "msk", my_sta_mk);
+    //     else
+    //         cJSON_AddStringToObject(res, "msk", NULL);
+    // }
+    // else
+    if (g_stick_run_mode == Work_Mode_LAN)
+    {
+
+        cJSON_AddStringToObject(res, "mode", "LAN"); // chagne according cgi new version
+        if (strlen(my_eth_ip) > 0)
+            cJSON_AddStringToObject(res, "ip", my_eth_ip);
+
+        if (strlen(my_eth_gw) > 0)
+            cJSON_AddStringToObject(res, "gtw", my_eth_gw);
+        else
+            cJSON_AddStringToObject(res, "gtw", NULL);
+
+        if (strlen(my_eth_mk) > 0)
+            cJSON_AddStringToObject(res, "msk", my_eth_mk);
+        else
+            cJSON_AddStringToObject(res, "msk", NULL);
+    }
     msg = cJSON_PrintUnformatted(res);
     cJSON_Delete(res);
     return msg;
@@ -711,17 +753,149 @@ static char *wlanget_handler_info_default_fun()
     wifi_ap_para_t ap_para = {0};
     general_query(NVS_AP_PARA, &ap_para);
 
-    cJSON_AddStringToObject(res, "mode", "AP");
-    cJSON_AddStringToObject(res, "sid", (char *)ap_para.ssid);
-    // cJSON_AddStringToObject(res, "psw", (char *)ap_para.password);
-    cJSON_AddStringToObject(res, "ip", "160.190.0.1");
-    cJSON_AddNumberToObject(res, "srh", get_rssi());
+    if (g_stick_run_mode == Work_Mode_AP_PROV)
+    {
+        cJSON_AddStringToObject(res, "mode", "AP");
+        cJSON_AddStringToObject(res, "sid", (char *)ap_para.ssid);
+        // cJSON_AddStringToObject(res, "psw", (char *)ap_para.password);
+        cJSON_AddStringToObject(res, "ip", "160.190.0.1");
+        cJSON_AddNumberToObject(res, "srh", get_rssi());
+    }
 
+    else if (g_stick_run_mode == Work_Mode_STA)
+    {
+        cJSON_AddNumberToObject(res, "srh", get_rssi());
+        cJSON_AddStringToObject(res, "mode", "STA");
+        if (strlen(my_sta_ip) > 0)
+            cJSON_AddStringToObject(res, "ip", my_sta_ip);
+
+        if (strlen(my_sta_gw) > 0)
+            cJSON_AddStringToObject(res, "gtw", my_sta_gw);
+        else
+            cJSON_AddStringToObject(res, "gtw", NULL);
+
+        if (strlen(my_sta_mk) > 0)
+            cJSON_AddStringToObject(res, "msk", my_sta_mk);
+        else
+            cJSON_AddStringToObject(res, "msk", NULL);
+    }
+    else if (g_stick_run_mode == Work_Mode_LAN)
+    {
+
+        cJSON_AddStringToObject(res, "mode", "LAN"); // chagne according cgi new version
+        if (strlen(my_eth_ip) > 0)
+            cJSON_AddStringToObject(res, "ip", my_eth_ip);
+
+        if (strlen(my_eth_gw) > 0)
+            cJSON_AddStringToObject(res, "gtw", my_eth_gw);
+        else
+            cJSON_AddStringToObject(res, "gtw", NULL);
+
+        if (strlen(my_eth_mk) > 0)
+            cJSON_AddStringToObject(res, "msk", my_eth_mk);
+        else
+            cJSON_AddStringToObject(res, "msk", NULL);
+    }
     msg = cJSON_PrintUnformatted(res);
     cJSON_Delete(res);
 
     return msg;
 }
+//----------------------------------------------------//
+
+static int8_t wlanset_handler_mode_staticip_fun(cJSON *value)
+{
+    int enable = -1;
+    char cEnable[8] = {0};
+    getJsonStr(cEnable, "oia", sizeof(cEnable), value);
+    enable = atoi(cEnable);
+    ASW_LOGI("static enbale: %d\n", enable);
+#if STATIC_IP_SET_ENABLE
+
+    uint8_t mstaic_flag = 0;
+
+    if (g_stick_run_mode == Work_Mode_AP_PROV || g_stick_run_mode == Work_Mode_IDLE)
+    {
+        ESP_LOGW("--- setting static ip info WARN ---", "the work mode is AP or NULL");
+        return ASW_FAIL;
+    }
+
+    net_static_info_t st_static_info = {0};
+    char cIp[16] = {0};
+    char cGw[16] = {0};
+    char cMk[16] = {0};
+    char cDns[16] = {0};
+
+    if (enable)
+    {
+        st_static_info.enble = 1;
+
+        if (getJsonStr(cIp, "ip", sizeof(cIp), value) != -1)
+        {
+            sscanf(cIp, "%hd.%hd.%hd.%hd", &st_static_info.ip[0], &st_static_info.ip[1],
+                   &st_static_info.ip[2], &st_static_info.ip[3]);
+        }
+        if (getJsonStr(cMk, "msk", sizeof(cMk), value) != -1)
+        {
+            sscanf(cMk, "%hd.%hd.%hd.%hd", &st_static_info.mask[0], &st_static_info.mask[1],
+                   &st_static_info.mask[2], &st_static_info.mask[3]);
+        }
+        if (getJsonStr(cGw, "gtw", sizeof(cGw), value) != -1)
+        {
+            sscanf(cGw, "%hd.%hd.%hd.%hd", &st_static_info.gateway[0], &st_static_info.gateway[1],
+                   &st_static_info.gateway[2], &st_static_info.gateway[3]);
+        }
+
+        if (getJsonStr(cDns, "dns", sizeof(cGw), value) != -1)
+        {
+            sscanf(cDns, "%hd.%hd.%hd.%hd", &st_static_info.maindns[0], &st_static_info.maindns[1],
+                   &st_static_info.maindns[2], &st_static_info.maindns[3]);
+        }
+
+        mstaic_flag = 1;
+    }
+    else
+    {
+        st_static_info.enble = 0;
+
+        mstaic_flag = 0;
+    }
+
+    st_static_info.work_mode = g_stick_run_mode;
+#if DEBUG_PRINT_ENABLE
+
+    printf("\n-------  setting static ip info --[%d]------\n", st_static_info.enble);
+    printf("   ip  :%hd.%hd.%d.%hd\n", st_static_info.ip[0], st_static_info.ip[1], st_static_info.ip[2], st_static_info.ip[3]);
+    printf("  mask :%hd.%hd.%d.%hd\n", st_static_info.mask[0], st_static_info.mask[1], st_static_info.mask[2], st_static_info.mask[3]);
+    printf("gateway:%hd.%hd.%hd.%hd\n", st_static_info.gateway[0], st_static_info.gateway[1], st_static_info.gateway[2], st_static_info.gateway[3]);
+    printf("\n-------  setting static ip info --[%d]------\n", st_static_info.work_mode);
+#endif
+    if (general_add(NVS_NET_STATIC_INFO, &st_static_info) != ASW_OK)
+    {
+        ESP_LOGE("--- setting static ip info Error ---", "FAILED write the static info to nvs!!");
+        return ASW_FAIL;
+    }
+
+    printf("\n set the static info , sys will restart...\n");
+
+    if (st_static_info.enble)
+    {
+        // config_net_static_set();
+
+        return CMD_STATIC_ENABLE;
+    }
+    else
+    {
+        // config_net_static_diable_set();
+        return CMD_STATIC_DISABLE;
+    }
+
+#else
+    return -1;
+#endif
+}
+
+//--------------------------------------------//
 
 #define NUM_SETTING_OPRT 6
 
@@ -1011,6 +1185,11 @@ static int16_t setting_handler_device_1_fun(char *action, cJSON *value)
         }
         return 0;
     }
+    //-----------  lanset ------------//
+    else if (strcmp(action, "lanset") == 0)
+    {
+        return wlanset_handler_mode_staticip_fun(value);
+    }
     else
     {
         return -1;
@@ -1037,9 +1216,11 @@ static int16_t setting_handler_device_3_fun(char *action, cJSON *value)
     {
         //-- Eng.Stg.Mch-lanstick 20220908 +-
         write_meter_configuration(value);
-        event_group_0 |= METER_CONFIG_MASK;
         event_group_0 |= PWR_REG_SOON_MASK;
         g_meter_sync = 0;
+        /*根据调试打印设置值，判断是否进行数据打印*/
+        if (g_asw_debug_enable > 1)
+            event_group_0 |= METER_CONFIG_MASK;
 
         return 0;
     }
@@ -1105,6 +1286,11 @@ static int8_t wlanset_handler_mode_state_fun(cJSON *value)
     if (strlen((char *)_sta_para.ssid) > 0)
     {
         general_add(NVS_STA_PARA, &_sta_para);
+        int work_mode = Work_Mode_STA;
+        general_add(NVS_WORK_MODE, &work_mode);
+
+        ///--------------------------/////
+
         g_task_inv_broadcast_msg |= MSG_WRT_STA_INFO_INDEX;
 
         return CMD_SYNC_REBOOT;
@@ -1364,6 +1550,10 @@ int8_t protocol_nearby_wlanset_handler(char *action, cJSON *value)
     else if (strcmp(action, "prov") == 0)
     {
         m_res_cmd = wlanset_handler_mode_prov_fun(value);
+    }
+    else if (strcmp(action, "staticip") == 0)
+    {
+        m_res_cmd = wlanset_handler_mode_staticip_fun(value);
     }
     else
     {

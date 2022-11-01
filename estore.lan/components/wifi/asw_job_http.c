@@ -60,7 +60,6 @@ static void web_page_handler(httpd_req_t *req, http_req_para_t *para)
 }
 
 //------------------6------------------------//
-
 void update_handler(httpd_req_t *req, http_req_para_t *para)
 {
     ASW_LOGW("******* update_handler  handle..");
@@ -118,6 +117,34 @@ static void getdevdata_handler(httpd_req_t *req, http_req_para_t *para) //[tgl l
         uint16_t m_len = strlen(msg);
         httpd_resp_send(req, msg, m_len);
         free(msg);
+    }
+    else
+    {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "request not found, 404");
+    }
+}
+
+//-----------------------------------------//
+// 11- 获取debug info
+
+static void get_debug_info_handler(httpd_req_t *req, http_req_para_t *para)
+{
+    ASW_LOGI("************get debug info ....");
+    char *msgBuf = NULL;
+
+    cJSON *res = cJSON_CreateObject();
+
+    cJSON_AddNumberToObject(res, "debug_value", g_asw_debug_enable);
+
+    msgBuf = cJSON_PrintUnformatted(res);
+
+    cJSON_Delete(res);
+
+    if (msgBuf != NULL)
+    {
+        uint16_t m_len = strlen(msgBuf);
+        httpd_resp_send(req, msgBuf, m_len);
+        free(msgBuf);
     }
     else
     {
@@ -192,6 +219,21 @@ static void wlanset_handler(httpd_req_t *req, http_req_para_t *para)
         esp_restart();
     }
     break;
+#if STATIC_IP_SET_ENABLE
+    case CMD_STATIC_ENABLE:
+        httpd_resp_send(req, POST_RES_OK, strlen(POST_RES_OK));
+        usleep(2000);
+        config_net_static_set(NULL);
+
+        break;
+
+    case CMD_STATIC_DISABLE:
+        httpd_resp_send(req, POST_RES_OK, strlen(POST_RES_OK));
+        usleep(2000);
+        config_net_static_diable_set(NULL);
+
+        break;
+#endif
     case CMD_SYNC_REBOOT:
         /// TDODO  sync from send msg.
 
@@ -340,6 +382,26 @@ static void setting_handler(httpd_req_t *req, http_req_para_t *para) //[tgl lan]
         /// have done in the func()
     }
     break;
+///////// SET STATIC INFO ///////////
+#if STATIC_IP_SET_ENABLE
+    case CMD_STATIC_ENABLE:
+        httpd_resp_send(req, POST_RES_OK, strlen(POST_RES_OK));
+        usleep(500);
+        sleep(2);
+        config_net_static_set(NULL);
+        // esp_restart();
+
+        break;
+
+    case CMD_STATIC_DISABLE:
+        httpd_resp_send(req, POST_RES_OK, strlen(POST_RES_OK));
+        usleep(500);
+        sleep(2);
+        config_net_static_diable_set(NULL);
+        //  esp_restart();
+        break;
+        ///////////////// END //////////////
+#endif
     default:
         httpd_resp_send(req, msg, strlen(msg));
         break;
@@ -349,7 +411,43 @@ static void setting_handler(httpd_req_t *req, http_req_para_t *para) //[tgl lan]
         cJSON_Delete(json);
     return;
 }
+//----------------------------------------//
+static void debug_handler(httpd_req_t *req, http_req_para_t *para)
+{
+    ASW_LOGI("Debug handler...");
 
+    int debug_print_value = -1;
+
+    int device = -1;
+
+    ASW_LOGW("debug handler:%d,%s\n", para->body_len, para->body);
+
+    cJSON *json;
+    json = cJSON_Parse(para->body);
+    if (json == NULL)
+    {
+        httpd_resp_send(req, POST_RES_ERR, strlen(POST_RES_ERR));
+        return;
+    }
+
+    getJsonNum(&device, "device", json);
+    getJsonNum(&debug_print_value, "debug_value", json);
+
+  
+
+    if (device == 666 && debug_print_value >= 0)
+    {
+        g_asw_debug_enable = debug_print_value;
+
+        ESP_LOGI("DEBUG-SET", " debug set value :%d  OK", g_asw_debug_enable);
+    }
+    else
+    {
+        ESP_LOGW(TAG, " debug set value Failed");
+    }
+
+    httpd_resp_send(req, POST_RES_OK, strlen(POST_RES_OK));
+}
 //--------------------9----------------------//
 static void innerfile_handler(httpd_req_t *req, http_req_para_t *para)
 {
@@ -664,8 +762,9 @@ static const http_req_tab_t http_get_tab[] = {
     {"/get_sys_log.cgi", get_log_handler},   //-10-
 
     //---------   add for lanstick-----
-    {"/lan.cgi", get_lan_netinfo_handler},  //-11-
-    {"/getdefine.cgi", getdefine_handler}}; //-12-
+    {"/lan.cgi", get_lan_netinfo_handler}, //-11-
+    {"/getdefine.cgi", getdefine_handler}, //-12-
+    {"/getdebug.cgi", get_debug_info_handler}};
 
 static const http_req_tab_t http_post_tab[] = {
     //------------Http ---ATE-----------//
@@ -676,10 +775,11 @@ static const http_req_tab_t http_post_tab[] = {
     {"/update_ate.cgi", http_ate_update_cmd}, //*14
 
     //--------------http---App-------//
-    {"/wlanset.cgi", wlanset_handler},  //-4- ble
-    {"/update.cgi", update_handler},    //-6-1 http
-    {"/fdbg.cgi", fdbg_handler},        //-7- ble
-    {"/setting.cgi", setting_handler}}; //-8- ble
+    {"/wlanset.cgi", wlanset_handler}, //-4- ble
+    {"/update.cgi", update_handler},   //-6-1 http
+    {"/fdbg.cgi", fdbg_handler},       //-7- ble
+    {"/setting.cgi", setting_handler}, //-8- ble
+    {"/debug.cgi", debug_handler}};    //啓用打印調試信息};
 
 //---------------------------------------------//
 Update_p update_info = NULL;
@@ -780,7 +880,7 @@ void update_info_gen(void)
 
         update_info->file_type = 0;
     }
-    else if (strstr(update_info->file_name, "arm") != NULL)
+    else if (strstr(update_info->file_name, "comm") != NULL)
     {
 
         memset(update_info->file_path, 0, sizeof(update_info->file_path));
@@ -803,7 +903,7 @@ static esp_err_t asw_get_handler(httpd_req_t *req)
     char *buf;
     size_t buf_len;
     http_req_para_t req_para = {0};
-    ESP_LOGI(TAG, "http get begin");
+
     // Eng.Stg.Mch-lanstick +
     fresh_before_http_handler();
 
@@ -817,37 +917,37 @@ static esp_err_t asw_get_handler(httpd_req_t *req)
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1) //[tgl mark]获取并打印信息，作为回调参数传递
     {
-        buf = calloc(buf_len, 1);
+        buf = malloc(buf_len);
         if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
         {
             ESP_LOGI(TAG, "Found URL query => %s", buf);
             /* Get value of expected key from query string */
             if (httpd_query_key_value(buf, "sn", req_para.sn, sizeof(req_para.sn)) == ESP_OK)
             {
-                ESP_LOGI(TAG, "Found => sn=%s", req_para.sn);
+                ASW_LOGI( "Found => sn=%s", req_para.sn);
             }
             if (httpd_query_key_value(buf, "device", req_para.device, sizeof(req_para.device)) == ESP_OK)
             {
-                ESP_LOGI(TAG, "Found => device=%s", req_para.device);
+                ASW_LOGI( "Found => device=%s", req_para.device);
             }
             if (httpd_query_key_value(buf, "secret", req_para.secret, sizeof(req_para.secret)) == ESP_OK)
             {
-                ESP_LOGI(TAG, "Found => secret=%s", req_para.secret);
+                ASW_LOGI( "Found => secret=%s", req_para.secret);
             }
             if (httpd_query_key_value(buf, "info", req_para.info, sizeof(req_para.info)) == ESP_OK)
             {
-                ESP_LOGI(TAG, "Found => info=%s", req_para.info);
+                ASW_LOGI( "Found => info=%s", req_para.info);
             }
             if (httpd_query_key_value(buf, "filename", req_para.filename, sizeof(req_para.filename)) == ESP_OK)
             {
-                ESP_LOGI(TAG, "Found => filename=%s", req_para.filename);
+                ASW_LOGI( "Found => filename=%s", req_para.filename);
             }
 
             ////////////////////////////////////////////////////////////
             char this_buf[10] = {0};
             if (httpd_query_key_value(buf, "date_day", this_buf, sizeof(this_buf)) == ESP_OK)
             {
-                ESP_LOGI(TAG, "Found => date_day=%s", this_buf);
+                ASW_LOGI( "Found => date_day=%s", this_buf);
                 int num = -1;
                 int parsed = 0;
                 parsed = sscanf(this_buf, "%d", &num);
@@ -876,7 +976,6 @@ static esp_err_t asw_get_handler(httpd_req_t *req)
         {
             ASW_LOGE("[ err ] No this http request: %s\n", req->uri);
             httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "request not found, 404");
-            ESP_LOGI(TAG, "http get end");
             return ESP_OK;
         }
     }
@@ -888,7 +987,7 @@ static esp_err_t asw_get_handler(httpd_req_t *req)
 
     /* After sending the HTTP response the old HTTP request
      * headers are lost. Check if HTTP request headers can be read now. */
-    ESP_LOGI(TAG, "http get end");
+
     return ESP_OK;
 }
 

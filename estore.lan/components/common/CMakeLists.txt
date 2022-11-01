@@ -5,7 +5,7 @@ file(GLOB_RECURSE source_list *.c)
 idf_component_register(SRCS "${source_list}"
                     INCLUDE_DIRS "include" 
                                  "../../main"
-                    REQUIRES  nvs_flash inv json fatfs cloud esp_https_ota)
+                    REQUIRES  nvs_flash inv json fatfs cloud esp_http_client esp_https_ota)
                     # REQUIRES mqtt inv wifi common update cloud fatfs esp_http_client esp_https_ota)
                     #  wifi   json vfs  esp-tls  meter
  

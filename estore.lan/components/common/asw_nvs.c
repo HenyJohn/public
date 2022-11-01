@@ -16,8 +16,7 @@
 #define SCHED_BAT_KEY "sched_bat_key"
 #define METER_CONTROL_KEY "meter_ctl_key"    // Lanstick-MultilInv
 #define NET_STATIC_INFO_KEY "net_static_key" // static  net info
-#define APN_PARA_KEY "apn_para_key"
-#define _3RD_MQTT_KEY "_3rd_key"
+
 //----------------------
 
 #define ATE_NAMESPACE "ate_namespace" //[tgl update] 新增版本
@@ -57,7 +56,6 @@ int restore_ap(void)
         wifi_ap_para_t ap_para_tmp = {0};
         general_query(NVS_AP_PARA, &ap_para_tmp);
 
-        // ESP_LOGW("==== TGL DEBUG ====","restore ap ps :%s",(char *)ap_para_tmp.password);
         memcpy(_ap_para.password, ap_para_tmp.password, sizeof(ap_para_tmp.password)); //[tgl mark] strlen->sizof
 
         general_add(NVS_AP_PARA, &_ap_para);
@@ -83,6 +81,12 @@ void factory_reset_nvs()
     general_delete(NVS_NET_STATIC_INFO);
 
     general_delete(NVS_METER_CONTROL);
+
+    //////////////////////////////
+    ///  添加 初始化电池配置及调度信息 待验证
+    general_delete(NVS_CONFIG);
+    general_delete(NVS_SCHED_BAT);
+    ///////////////////////////
 }
 
 //------------------------------------//
@@ -244,16 +248,6 @@ int8_t general_query(Enum_NVS_NameSpace type, void *p_data)
             blob_len = sizeof(net_static_info_t);
             my_handle = ate_nvs_handle;
             break;
-        case NVS_APN_PARA:
-            memcpy(key, APN_PARA_KEY, strlen(APN_PARA_KEY));
-            blob_len = sizeof(apn_para_t);
-            my_handle = ate_nvs_handle;
-            break;
-        case NVS_3RD_MQTT_PARA:
-            memcpy(key, _3RD_MQTT_KEY, strlen(_3RD_MQTT_KEY));
-            blob_len = sizeof(_3rd_mqtt_para_t);
-            my_handle = ate_nvs_handle;
-            break;
 
         default:
             goto RES_ERR;
@@ -365,14 +359,7 @@ int8_t general_delete(int type)
             memcpy(key, NET_STATIC_INFO_KEY, strlen(NET_STATIC_INFO_KEY));
             my_handle = ate_nvs_handle;
             break;
-        case NVS_APN_PARA:
-            memcpy(key, APN_PARA_KEY, strlen(APN_PARA_KEY));
-            my_handle = ate_nvs_handle;
-            break;
-        case NVS_3RD_MQTT_PARA:
-            memcpy(key, _3RD_MQTT_KEY, strlen(_3RD_MQTT_KEY));
-            my_handle = ate_nvs_handle;
-            break;
+
         default:
             goto RES_ERR;
             break;
@@ -415,7 +402,7 @@ int8_t get_device_sn(void)
 
     if (strlen(para.psn) > 0)
     {
-        ESP_LOGI(TAG, "first get psn %s \n", para.psn);
+        ASW_LOGI( "first get psn %s \n", para.psn);
         return ASW_OK;
     }
 
@@ -512,16 +499,7 @@ int8_t general_add(Enum_NVS_NameSpace type, void *p_data)
             blob_len = sizeof(net_static_info_t);
             my_handle = ate_nvs_handle;
             break;
-        case NVS_APN_PARA:
-            memcpy(key, APN_PARA_KEY, strlen(APN_PARA_KEY));
-            blob_len = sizeof(apn_para_t);
-            my_handle = ate_nvs_handle;
-            break;
-        case NVS_3RD_MQTT_PARA:
-            memcpy(key, _3RD_MQTT_KEY, strlen(_3RD_MQTT_KEY));
-            blob_len = sizeof(_3rd_mqtt_para_t);
-            my_handle = ate_nvs_handle;
-            break;
+
         default:
             goto RES_ERR;
             break;
@@ -557,12 +535,4 @@ int8_t general_add(Enum_NVS_NameSpace type, void *p_data)
         return ASW_FAIL;
     }
     return ASW_FAIL;
-}
-
-void reboot_30min_check(void)
-{
-    if (get_second_sys_time() > 1800)
-    {
-        esp_restart();
-    }
 }

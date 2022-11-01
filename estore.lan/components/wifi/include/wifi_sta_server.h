@@ -16,6 +16,7 @@
 
 #include <esp_wifi.h>
 #include <esp_netif.h>
+#include <esp_eth.h>
 #include "protocol_examples_common.h"
 
 #include "cJSON.h"
@@ -59,6 +60,7 @@ void get_hostcomm(char *buff, char *puff);
 int get_rssi(void);
 
 int get_all_log(char *buf);
+int get_eth_connect_status(void);
 int get_eth_ip(char *ip);
 
 int get_sta_ip(char *ip); // v2.0.0 add
@@ -98,7 +100,8 @@ int check_wifi_reconnect(void);
 ///////////////////////////////////
 int get_eth_mac(char *mac);
 int get_sta_mac(char *mac);
-
+// int config_net_static_set();
+int config_net_static_set(esp_netif_t *netif);
 int config_net_static_diable_set();
 
 /////////////////////////////////

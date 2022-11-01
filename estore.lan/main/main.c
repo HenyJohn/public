@@ -22,29 +22,35 @@ TaskHandle_t cgi_task_handle = NULL;
 BaseType_t xReturned;
 //===============================================//
 
-// void stick_network_init(void);
-// void create_wlan_configled(void);
+void stick_network_init(void);
+void create_wlan_configled(void);
 
 void task_ate_create();
 void task_inv_create();
 void task_cloud_create();
 void task_led_create();
-void print_meminfo_task(); //[tgl mem]debug
+void print_meminfo_task();
 
-bool g_asw_debug_enable = 1;
+uint8_t g_asw_debug_enable = 0;
 
+bool g_net_connnect_flag = false; //网络连接状态   0-连接断开;1-连接正常
+bool g_ap_connnect_flag = false;  // AP连接状态   0-连接断开;1-连接正常
+bool g_asw_static_ip_enable = 0;
 bool g_meter_inv_synupload_flag = 0;
 int64_t g_uint_meter_data_time; //逆变器和电表数据上传同步 < 10s
 
-uint8_t g_stick_run_mode = Work_Mode_AP_PROV; // 0---初始状态;1---sta模式;2--- AP配网模式;3---Lan 模式
+uint8_t g_stick_run_mode; // 0---初始状态;1---sta模式;2--- AP配网模式;3---Lan 模式
 
 uint8_t g_ssc_enable;
 
 uint8_t g_parallel_enable = 99; //并机模式 1-打开 0-关闭
 uint8_t g_host_modbus_id = 3;   //并机模式下主机modbus id
+bool g_safety_is_96_97 = 0;
+bool g_battery_selfmode_is_same=0;  
 
 // char g_p2p_mode = 0 ;
 //===================================//
+// xSemaphoreHandle server_ready;
 xSemaphoreHandle g_semar_psn_ready;
 xSemaphoreHandle g_semar_wrt_sync_reboot;
 int set_ate(void);
@@ -54,11 +60,17 @@ void app_main()
 {
     boot_rollback_check();
 
+    g_net_connnect_flag = false; //网络连接状态   0-连接断开;1-连接正常
+    g_ap_connnect_flag = false;  // AP连接状态   0-连接断开;1-连接正常
+
     g_meter_inv_synupload_flag = 0;
     g_uint_meter_data_time = 0;
+    g_state_ethernet_connect = 0;
     g_ssc_enable = 0;
 
-    // xSemaphoreHandle server_ready = xSemaphoreCreateBinary();
+    g_stick_run_mode = Work_Mode_STA; // 默认为 wifi-sta
+
+    xSemaphoreHandle server_ready = xSemaphoreCreateBinary();
     g_semar_psn_ready = xSemaphoreCreateBinary();
     g_semar_wrt_sync_reboot = xSemaphoreCreateBinary();
     // wifi_sta_para_t sta_para = {0};
@@ -89,10 +101,9 @@ void app_main()
     }
 
     /********************/
-    /** 网络初始化也在这里面 */
-    // net_http_server_start(&server_ready);
-    net_http_server_start(NULL);
-    // xSemaphoreTake(server_ready, portMAX_DELAY);
+
+    net_http_server_start(&server_ready);
+    xSemaphoreTake(server_ready, portMAX_DELAY);
 
     if (get_device_sn() == ASW_FAIL)
     {
@@ -101,7 +112,7 @@ void app_main()
         xSemaphoreTake(g_semar_psn_ready, portMAX_DELAY);
     }
 
-    // vSemaphoreDelete(server_ready);
+    vSemaphoreDelete(server_ready);
 
     create_queue_msg();
     sleep(1); // tgl mark for test
@@ -110,6 +121,7 @@ void app_main()
     task_cloud_create();
 
     task_led_create(); //[tgl lan]注意引脚 不要与eth引脚冲突
+
     // xTaskCreate(print_meminfo_task, "print_meminfo_task", 4096, NULL, 5, NULL); //[ mem]debug
 }
 
@@ -170,8 +182,8 @@ void print_meminfo_task()
     {
         ASW_LOGE("mem free has %dKiB.", esp_get_free_heap_size() / 1024);
 
-        ESP_LOGW("Stick Run Mode", " [%d] 0:IDLE,1:AP-Prov,2:WIFI-STA,3.cloud-status:%d",
-                 g_stick_run_mode, g_state_mqtt_connect);
+        ESP_LOGW("Stick Run Mode", " [%d] 0:IDLE,1:AP-Prov,2:WIFI-STA,3:LAN ,lan-status:%d ,cloud-status:%d",
+                 g_stick_run_mode, get_eth_connect_status(), g_state_mqtt_connect);
 
         vTaskList((char *)&InfoBuffer);
         ASW_LOGW("|任务状态|优先级|剩余栈|任务序号\r\n");

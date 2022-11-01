@@ -16,18 +16,21 @@
 #include <netdb.h>
 #include "driver/gpio.h"
 
+#include "esp_eth.h"
 #include "inv_com.h"
 #include "asw_job_http.h"
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_net_event_group;
 
+int8_t g_state_ethernet_connect = -1; //-1 初始状态; 0: 连接断开 ; 1: 连接成功 ; 2: 获取ip地址
+
 #define WIFI_CONNECTED_BIT BIT0
 #define ETH_CONNECTED_BIT BIT1
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY 5
 
-#define CONFIG_APSTA_AP_SSID "AISWEI-9999"
+#define CONFIG_APSTA_AP_SSID "AISWEI-8888"
 #define CONFIG_APSTA_AP_PASSWORD "12345678"
 
 #define CONFIG_APSTA_STA_SSID "11111111"          // 32
@@ -139,7 +142,18 @@ char *get_ssid(void)
 //---------------------------------------------//
 int get_wifi_sta_connect_status(void)
 {
-    return 0; // ok
+    EventBits_t var;
+    if (s_net_event_group == NULL)
+        return -1;
+    var = xEventGroupGetBits(s_net_event_group);
+    if (var & WIFI_CONNECTED_BIT) //
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
 }
 //-----------------
 // add wifi-sta mode v2.0.0
@@ -179,9 +193,34 @@ void wifi_sta_stop()
 }
 
 //---------------------------------------------//
+int get_eth_connect_status(void)
+{
+    EventBits_t var;
+    if (s_net_event_group == NULL)
+        return -1;
+    var = xEventGroupGetBits(s_net_event_group);
+    if (var & ETH_CONNECTED_BIT) // [tgl lan]add ---ETH_CONNECTED_BIT
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+//---------------------------------------------//
 int get_eth_ip(char *ip)
 {
-    return -1;
+    if (get_eth_connect_status() == 0)
+    {
+        memcpy(ip, my_eth_ip, strlen(my_eth_ip));
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
 }
 //----------------------------------------------//
 int get_sta_ip(char *ip)
@@ -199,6 +238,16 @@ int get_sta_ip(char *ip)
 //------------------------------------------------//
 int get_sta_mac(char *mac)
 {
+    if (get_wifi_sta_connect_status() == 0 && g_stick_run_mode == Work_Mode_STA)
+    {
+        char pMac[18];
+        sprintf(pMac, "%02X:%02x:%02X:%02X:%02X:%02X", my_sta_mac[0], my_sta_mac[1],
+                my_sta_mac[2], my_sta_mac[3], my_sta_mac[4], my_sta_mac[5]);
+        memcpy(mac, pMac, strlen(pMac) + 1);
+
+        return 0;
+    }
+    else
     {
         return -1;
     }
@@ -206,7 +255,19 @@ int get_sta_mac(char *mac)
 //-------------------------------------------//
 int get_eth_mac(char *mac)
 {
-    return -1;
+    if (get_eth_connect_status() == 0 && g_stick_run_mode == Work_Mode_LAN)
+    {
+        char pMac[18];
+        sprintf(pMac, "%02X:%02x:%02X:%02X:%02X:%02X", my_eth_mac[0], my_eth_mac[1],
+                my_eth_mac[2], my_eth_mac[3], my_eth_mac[4], my_eth_mac[5]);
+        memcpy(mac, pMac, strlen(pMac) + 1);
+
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
 }
 //--------------------------------------------//
 
@@ -382,6 +443,142 @@ static void set_disable_static_ip(esp_netif_t *netif)
     }
     return;
 }
+///////////////////////////////////////////////////////////////////
+int config_net_static_set_with_config(esp_netif_t *netif, uint8_t stickRunMode)
+{
+    net_static_info_t st_net_lanInfo = {0};
+    esp_err_t res_ap_get;
+    char staticIpSet[16] = {0};
+    char staticMskSet[16] = {0};
+    char staticGtwSet[16] = {0};
+    char staticDnsSet[16] = {0};
+    /////////////// ESP_LOGW(TAG, "DHCP Ip COnfig....")///////////////
+    // tcpip_adapter_ip_info_t local_ip;
+
+    if (general_query(NVS_NET_STATIC_INFO, &st_net_lanInfo) == ASW_FAIL)
+    {
+        ESP_LOGW("-- config static ip WARN --", " noting to be done with query erro ");
+
+        return ASW_FAIL;
+    }
+    printf("\n-----------config_net_static_set------\n");
+    printf("\n--- set work mode:%d, stick run mode:%d----\n", st_net_lanInfo.work_mode, g_stick_run_mode);
+    assert(netif != NULL);
+    ///////////////////////////////////////////////////////////////
+
+    if (esp_netif_dhcpc_stop(netif) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to stop dhcp client");
+    }
+
+    if (st_net_lanInfo.enble && st_net_lanInfo.work_mode == stickRunMode)
+    {
+        /*write */
+        sprintf(staticIpSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.ip[0], st_net_lanInfo.ip[1],
+                st_net_lanInfo.ip[2], st_net_lanInfo.ip[3]);
+
+        sprintf(staticMskSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.mask[0], st_net_lanInfo.mask[1],
+                st_net_lanInfo.mask[2], st_net_lanInfo.mask[3]);
+
+        sprintf(staticGtwSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.gateway[0], st_net_lanInfo.gateway[1],
+                st_net_lanInfo.gateway[2], st_net_lanInfo.gateway[3]);
+
+        sprintf(staticDnsSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.maindns[0], st_net_lanInfo.maindns[1],
+                st_net_lanInfo.maindns[2], st_net_lanInfo.maindns[3]);
+
+        set_static_ip(netif, staticIpSet, staticGtwSet, staticMskSet, staticDnsSet);
+
+        printf("\n-----------config_net_static_set STA------\n");
+        return ASW_OK;
+    }
+
+    else
+    {
+        if (esp_netif_dhcpc_start(netif) != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to start dhcp client");
+            return ASW_FAIL;
+        }
+
+        return ASW_OK;
+    }
+}
+
+/* 配置静态ip信息 */
+int config_net_static_set(esp_netif_t *netif)
+{
+    net_static_info_t st_net_lanInfo = {0};
+    esp_err_t res_ap_get;
+    char staticIpSet[16] = {0};
+    char staticMskSet[16] = {0};
+    char staticGtwSet[16] = {0};
+    char staticDnsSet[16] = {0};
+
+    //////////// ESP_LOGW(TAG, "DHCP Ip COnfig....") /////////////////////
+    // tcpip_adapter_ip_info_t local_ip;
+
+    if (general_query(NVS_NET_STATIC_INFO, &st_net_lanInfo) == ASW_FAIL)
+    {
+        ESP_LOGW("-- config static ip WARN --", " noting to be done with query erro ");
+        return ASW_FAIL;
+    }
+
+    printf("\n-----------config_net_static_set------\n");
+    printf("\n--- set work mode:%d, stick run mode:%d----\n",
+           st_net_lanInfo.work_mode, g_stick_run_mode);
+    printf("\n-----------config_net_static_set------\n");
+
+    ////////////////////////////////////////////////////////////////////
+
+    if (st_net_lanInfo.enble)
+    {
+        /*write */
+        sprintf(staticIpSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.ip[0], st_net_lanInfo.ip[1],
+                st_net_lanInfo.ip[2], st_net_lanInfo.ip[3]);
+
+        sprintf(staticMskSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.mask[0], st_net_lanInfo.mask[1],
+                st_net_lanInfo.mask[2], st_net_lanInfo.mask[3]);
+
+        sprintf(staticGtwSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.gateway[0], st_net_lanInfo.gateway[1],
+                st_net_lanInfo.gateway[2], st_net_lanInfo.gateway[3]);
+
+        sprintf(staticDnsSet, "%hd.%hd.%hd.%hd", st_net_lanInfo.maindns[0], st_net_lanInfo.maindns[1],
+                st_net_lanInfo.maindns[2], st_net_lanInfo.maindns[3]);
+
+        if (st_net_lanInfo.work_mode == Work_Mode_LAN && g_stick_run_mode == Work_Mode_LAN)
+        {
+            assert(s_asw_esp_netif != NULL);
+
+            set_static_ip(s_asw_esp_netif, staticIpSet, staticGtwSet, staticMskSet, staticDnsSet);
+            g_asw_static_ip_enable = 1;
+
+            printf("\n-----------config_net_static_set LAN------\n");
+        }
+        else if (st_net_lanInfo.work_mode == Work_Mode_STA && g_stick_run_mode == Work_Mode_STA)
+        {
+            assert(netif_wifiSTA != NULL);
+            set_static_ip(netif_wifiSTA, staticIpSet, staticGtwSet, staticMskSet, staticDnsSet);
+            g_asw_static_ip_enable = 1;
+
+            printf("\n-----------config_net_static_set STA------\n");
+        }
+        else
+        {
+            printf("\n----------DHCP IP------\n");
+            if (netif != NULL)
+                if (esp_netif_dhcpc_start(netif) != ESP_OK)
+                {
+                    ESP_LOGE(TAG, "Failed to start dhcp client");
+                }
+            g_asw_static_ip_enable = 0;
+            ESP_LOGW("-- config static ip WARN --", " noting to be done with no fit mode ");
+            return ASW_FAIL;
+        }
+    }
+
+    return ASW_OK;
+}
+//---------------------------------------//
 
 int config_net_static_diable_set()
 {
@@ -398,6 +595,20 @@ int config_net_static_diable_set()
 
     if (st_net_lanInfo.enble)
         return ASW_OK;
+
+    if (st_net_lanInfo.work_mode == Work_Mode_LAN && g_stick_run_mode == Work_Mode_LAN)
+    {
+        assert(s_asw_esp_netif != NULL);
+        set_disable_static_ip(s_asw_esp_netif);
+        g_asw_static_ip_enable = 0;
+    }
+    else if (st_net_lanInfo.work_mode == Work_Mode_STA && g_stick_run_mode == Work_Mode_STA)
+    {
+        assert(netif_wifiSTA != NULL);
+
+        set_disable_static_ip(netif_wifiSTA);
+        g_asw_static_ip_enable = 0;
+    }
 
     else
     {
@@ -422,7 +633,60 @@ void asw_ip_event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED)
+    if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_GOT_IP)
+    {
+        ESP_LOGW("Got IPv4 event", "Interface \"%s\" address: " IPSTR, esp_netif_get_desc(event->esp_netif), IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "ethernet-got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(TAG, "ethernet-got gw  =" IPSTR, IP2STR(&event->ip_info.gw));
+        ESP_LOGI(TAG, "ethernet-netmask     =" IPSTR, IP2STR(&event->ip_info.netmask));
+
+        memset(my_eth_ip, 0, sizeof(my_eth_ip));
+        strcpy(my_eth_ip, ip4addr_ntoa(&event->ip_info.ip));
+
+        memset(my_eth_gw, 0, sizeof(my_eth_gw));
+        strcpy(my_eth_gw, ip4addr_ntoa(&event->ip_info.gw));
+
+        memset(my_eth_mk, 0, sizeof(my_eth_mk));
+        strcpy(my_eth_mk, ip4addr_ntoa(&event->ip_info.netmask));
+
+        assert(s_asw_esp_netif != NULL);
+
+        ////////////////////  get eth DNS /////////////////
+
+        esp_netif_dns_info_t mNetIfDns;
+
+        ESP_ERROR_CHECK(esp_netif_get_dns_info(s_asw_esp_netif, ESP_NETIF_DNS_MAIN, &mNetIfDns));
+        memset(my_eth_dns, 0, sizeof(my_eth_dns));
+
+        // printf("\n ethernet dns get" IP2STR(&mNetIfDns.ip));
+
+        strcpy(my_eth_dns, ip4addr_ntoa(&mNetIfDns.ip));
+
+        ////////////////////  get eth mac /////////////////
+
+        memset(my_sta_mac, 0, sizeof(my_eth_mac));
+        // esp_netif_t *esp_netif = get_asw_netif_from_desc("eth");
+
+        esp_netif_get_mac(s_asw_esp_netif, my_eth_mac);
+        ESP_LOGI(TAG, " sta eth :");
+        for (uint8_t i = 0; i < 6; i++)
+            printf("%0x.", my_eth_mac[i]);
+        printf("\n");
+
+        ///////////////////////////////////////////////////
+
+        xEventGroupSetBits(s_net_event_group, ETH_CONNECTED_BIT);
+
+        g_state_ethernet_connect = 2;
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_ETH_LOST_IP)
+    {
+        xEventGroupClearBits(s_net_event_group, ETH_CONNECTED_BIT);
+        g_state_ethernet_connect = 0;
+
+        ASW_LOGE("EThernet is lost!!!");
+    }
+    else if (event_base == IP_EVENT && event_id == IP_EVENT_AP_STAIPASSIGNED)
     {
         ASW_LOGI("A state connected to the AP!!! ");
     }
@@ -499,7 +763,7 @@ void asw_wifi_event_handler(void *arg, esp_event_base_t event_base,
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
         printf("asw_wifi_event_handler(void *arg, esp_event_base_t event_base \n");
-        // esp_wifi_connect();
+        esp_wifi_connect();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
@@ -525,6 +789,59 @@ void asw_wifi_event_handler(void *arg, esp_event_base_t event_base,
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED)
     {
         ASW_LOGI("  WIFI_EVENT_STA_CONNECTED !");
+
+#if STATIC_IP_SET_ENABLE
+        if (g_stick_run_mode != Work_Mode_LAN)
+            config_net_static_set(netif_wifiSTA);
+        else
+        {
+            if (esp_netif_dhcpc_start(netif_wifiSTA) != ESP_OK)
+            {
+                ESP_LOGE(TAG, " netif_wifiSTA Failed to start dhcp client");
+            }
+        }
+#endif
+        // config_net_static_set_with_config(netif_wifiSTA, Work_Mode_STA);
+    }
+}
+
+//---------------------
+void asw_eth_event_handler(void *arg, esp_event_base_t event_base,
+                           int32_t event_id, void *event_data)
+{
+    ASW_LOGI("asw_eth_event_handler !");
+    esp_netif_t *esp_netif = (esp_netif_t *)arg;
+    if (event_id == ETHERNET_EVENT_CONNECTED)
+    {
+        ESP_LOGW(TAG, "ETH is connectted");
+        g_state_ethernet_connect = 1;
+#if STATIC_IP_SET_ENABLE
+        g_stick_run_mode = Work_Mode_LAN; // tgl mark add +++ for static info set
+
+        // config_net_static_set_with_config(s_asw_esp_netif, Work_Mode_LAN);
+
+        //////////////////////  debug ///////////////////////
+
+        {
+            if (esp_netif_dhcpc_start(arg) != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Failed to start dhcp client");
+            }
+        }
+#endif
+        ////////////////////////////////////////////////////
+
+        //   asw_mqtt_client_start();
+    }
+    if (event_id == ETHERNET_EVENT_DISCONNECTED)
+    {
+        ESP_LOGW(TAG, "ETH is Disconnectted");
+        g_state_ethernet_connect = 0;
+        xEventGroupClearBits(s_net_event_group, ETH_CONNECTED_BIT);
+        mqtt_client_destroy_free();
+
+        // v2.0.0 change Lan 模式下，拔掉网口后，需重启或配网重启后才进入sta模式
+        // if (get_wifi_sta_connect_status() != 0)
     }
 }
 
@@ -608,7 +925,18 @@ int get_all_log(char *buf)
 
     get_time(now_timex, sizeof(now_timex));
 
-    if (1)
+    /* v2.0.0 add change */
+    if (g_stick_run_mode == Work_Mode_LAN)
+    {
+        get_eth_ip(ipx);
+        sprintf(buft, "\n%s ip:%s ", now_timex, ipx);
+    }
+    else if (g_stick_run_mode == Work_Mode_STA)
+    {
+        get_sta_ip(ipx);
+        sprintf(buft, "\n%s ip:%s ", now_timex, ipx);
+    }
+    else if (g_stick_run_mode == Work_Mode_AP_PROV)
     {
         sprintf(buft, "\n%s ip:%s ", now_timex, "160.190.0.1");
     }
@@ -625,7 +953,7 @@ static void start_webserver(void)
 {
     if (s_http_server != NULL)
     {
-        ESP_LOGW(TAG, "http server already ok");
+        ESP_LOGW(TAG, "http server is runing....");
         return;
     }
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -637,7 +965,7 @@ static void start_webserver(void)
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.stack_size = 4096 * 2;
     config.server_port = 8484;
-    config.recv_wait_timeout = 30;
+    config.recv_wait_timeout = 30; /// tgl mark for W (xxxxx) httpd_txrx: httpd_sock_err: error in recv : 11” erro
     //-----------<<<
     // Start the httpd server
     ESP_LOGW(TAG, "Starting server on port: '%d'", config.server_port);
@@ -653,6 +981,58 @@ static void start_webserver(void)
 
     ESP_LOGE(TAG, "Error starting server!");
     return;
+}
+
+//-----------------------------------//
+
+static void eth_net_start(void)
+{
+    ASW_LOGW("ETH NET  start.....");
+    char *desc;
+    esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_ETH();
+    // Prefix the interface description with the module TAG
+    // Warning: the interface desc is used in tests to capture actual connection details (IP, gw, mask)
+    // Warning: the interface desc is used in tests to capture actual connection details (IP, gw, mask)
+    asprintf(&desc, "%s: %s", TAG, esp_netif_config.if_desc);
+
+    esp_netif_config.if_desc = desc;
+    esp_netif_config.route_prio = 200; // Lan eth 优先级 > wifi-sta
+    esp_netif_config_t netif_config = {
+        .base = &esp_netif_config,
+        .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH};
+    s_asw_esp_netif = esp_netif_new(&netif_config);
+
+    free(desc);
+
+    eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+    eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
+    phy_config.phy_addr = CONFIG_EXAMPLE_ETH_PHY_ADDR;
+    phy_config.reset_gpio_num = CONFIG_EXAMPLE_ETH_PHY_RST_GPIO;
+
+    mac_config.smi_mdc_gpio_num = CONFIG_EXAMPLE_ETH_MDC_GPIO;
+    mac_config.smi_mdio_gpio_num = CONFIG_EXAMPLE_ETH_MDIO_GPIO;
+    s_mac = esp_eth_mac_new_esp32(&mac_config);
+
+    s_phy = esp_eth_phy_new_ip101(&phy_config);
+
+    // Install Ethernet driver
+    esp_eth_config_t config = ETH_DEFAULT_CONFIG(s_mac, s_phy);
+    ESP_ERROR_CHECK(esp_eth_driver_install(&config, &s_eth_handle));
+
+    s_eth_glue = esp_eth_new_netif_glue(s_eth_handle);
+    esp_netif_attach(s_asw_esp_netif, s_eth_glue);
+
+    // Register user defined event handers
+
+    esp_eth_start(s_eth_handle);
+
+    xEventGroupSetBits(s_net_mode_group, ETH_MODE_BIT);
+
+    int route_prio = esp_netif_get_route_prio(s_asw_esp_netif);
+    // #if DEBUG_PRINT_ENABLE
+    ASW_LOGI("====================== \n Lan ETH route prio:%d\n=====================\n", route_prio);
+    // #endif
+    ESP_LOGI(TAG, " ETH NET INIT Finished!!");
 }
 
 //-----------------------------------------//
@@ -700,14 +1080,26 @@ static void asw_wifi_init()
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &asw_ip_event_handler, NULL, &instance_ip_event_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &asw_wifi_event_handler, NULL, &instance_wifi_event_any_id));
+
+    // dhcp_ip_config(); //0721 -
 }
 //----------------------------------------//
 void asw_wifi_stop()
 {
+    wifi_mode_t m_wifi_mode;
+    esp_wifi_get_mode(&m_wifi_mode);
+    if (m_wifi_mode == WIFI_MODE_NULL)
+    {
+        ESP_LOGW(TAG, "WiFi mode is NULL !! return");
+        return;
+    }
+
+    ESP_ERROR_CHECK(esp_wifi_disconnect());
     ESP_ERROR_CHECK(esp_wifi_stop());
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_NULL));
 }
 //-----------------------------------//
 static void asw_wifi_ap_mode()
@@ -720,11 +1112,11 @@ static void asw_wifi_ap_mode()
     wifi_config_t wifi_ap_config = {
         .ap = {
             .ssid = CONFIG_APSTA_AP_SSID,
-            .ssid_len = 0,
+            .ssid_len = strlen(CONFIG_APSTA_AP_SSID),
             .channel = s_ap_channel, // EXAMPLE_ESP_WIFI_CHANNEL,
             .password = CONFIG_APSTA_AP_PASSWORD,
-            .max_connection = 4,                 // EXAMPLE_MAX_STA_CONN,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK}, // WIFI_AUTH_WPA_WPA2_PSK,WIFI_AUTH_WPA_PSK
+            .max_connection = 4, // EXAMPLE_MAX_STA_CONN,
+            .authmode = WIFI_AUTH_WPA_WPA2_PSK},
     };
 
     if (strlen(CONFIG_APSTA_AP_PASSWORD) == 0)
@@ -737,11 +1129,12 @@ static void asw_wifi_ap_mode()
 
     if (strlen((char *)ap_para.ssid) > 0)
     {
+
         memcpy(wifi_ap_config.ap.ssid, ap_para.ssid, strlen((char *)ap_para.ssid));
         memcpy(wifi_ap_config.ap.password, ap_para.password, strlen((char *)ap_para.password));
     }
 
-    ESP_LOGE(TAG, "ap_config,ssid:%s,pass:%s,channel:%d",
+    ESP_LOGE(TAG, "ap_config,ssid:%s,pawd:%s,channel:%d",
              (char *)wifi_ap_config.ap.ssid, (char *)wifi_ap_config.ap.password, wifi_ap_config.ap.channel);
 
     esp_wifi_set_mode(WIFI_MODE_AP);
@@ -775,7 +1168,6 @@ static void asw_wifi_sta_mode()
 
     if (strlen((char *)sta_para.ssid) > 0) //[mark]会运行到这里吗？？？
     {
-
         memcpy(wifi_sta_config.sta.ssid, sta_para.ssid, sizeof(sta_para.ssid));             //[mark] strlen -> sizeof
         memcpy(wifi_sta_config.sta.password, sta_para.password, sizeof(sta_para.password)); //[mark] strlen -> sizeof
     }
@@ -789,10 +1181,8 @@ static void asw_wifi_sta_mode()
     ESP_LOGE(TAG, " WIFI STA,ssid:%s,password:%s \n", wifi_sta_config.sta.ssid, wifi_sta_config.sta.password);
 
     int route_prio = esp_netif_get_route_prio(netif_wifiSTA);
-#if DEBUG_PRINT_ENABLE
 
-    printf("\n======================= \n WIFI STA route prio:%d\n=====================\n", route_prio);
-#endif
+    ESP_LOGI(TAG, "\n======================= \n WIFI STA route prio:%d\n=====================\n", route_prio);
     esp_wifi_start();
 }
 
@@ -854,7 +1244,7 @@ void asw_wifi_apscan_mode()
     wifi_config_t wifi_ap_config = {
         .ap = {
             .ssid = CONFIG_APSTA_AP_SSID,
-            .ssid_len = 0,
+            .ssid_len = strlen(CONFIG_APSTA_AP_SSID),
             .channel = s_ap_channel, // EXAMPLE_ESP_WIFI_CHANNEL,
             .password = CONFIG_APSTA_AP_PASSWORD,
             .max_connection = 4, // EXAMPLE_MAX_STA_CONN,
@@ -872,11 +1262,12 @@ void asw_wifi_apscan_mode()
     if (strlen((char *)ap_para.ssid) > 0)
     {
         // printf("\n==========  ap scan job: ======\n ap_para.ssid:%s,ap_para.password:%s\n", (char *)ap_para.ssid, (char *)ap_para.password);
+
         memcpy(wifi_ap_config.ap.ssid, ap_para.ssid, sizeof(ap_para.ssid));
         memcpy(wifi_ap_config.ap.password, ap_para.password, sizeof(ap_para.password));
     }
 
-    ESP_LOGE(TAG, "ap_config,ssid:%s,pass:%s,channel:%d",
+    ESP_LOGE(TAG, "ap_config,ssid:%s,pawd:%s,channel:%d",
              (char *)wifi_ap_config.ap.ssid, (char *)wifi_ap_config.ap.password, wifi_ap_config.ap.channel);
 
     esp_wifi_set_mode(WIFI_MODE_AP);
@@ -885,7 +1276,7 @@ void asw_wifi_apscan_mode()
     if (netif_wifiSTA == NULL)
         netif_wifiSTA = esp_netif_create_default_wifi_sta();
 
-    esp_wifi_set_mode(WIFI_MODE_AP);
+    esp_wifi_set_mode(WIFI_MODE_APSTA);
 
     esp_wifi_start();
 }
@@ -914,9 +1305,9 @@ void asw_wifi_manager(enmWiFiJob mCmd)
     default:
         break;
     }
-    // dhcp_ip_config();
+    dhcp_ip_config();
 
-    // start_webserver();
+    start_webserver();
 }
 
 void asw_net_start(void)
@@ -932,17 +1323,20 @@ void asw_net_start(void)
     ESP_ERROR_CHECK(esp_netif_init()); // [ mark] tcpip_adapter_init（）->esp_netif_init
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(ETH_EVENT, ESP_EVENT_ANY_ID, &asw_eth_event_handler, NULL, &instance_eth_event_any_id));
+
     s_net_event_group = xEventGroupCreate();
 
     s_net_mode_group = xEventGroupCreate();
 
     asw_wifi_init();
 
-    // eth_net_start();
+    eth_net_start();
 
     usleep(500 * 1000);
 
-    if (1)
+    // if (get_eth_connect_status() != 0 )
+    if (g_state_ethernet_connect < 1)
     {
         //启动wifi-eth
         // wifi_sta_start();
@@ -955,20 +1349,23 @@ void asw_net_start(void)
         {
             asw_wifi_manager(WIFI_JOB_SCAN);
             sleep(1);
-            asw_wifi_manager(WIFI_JOB_AP);
+            asw_wifi_manager(WIFI_JOB_AP_SCAN);
         }
         break;
 
+        case Work_Mode_STA:
         default:
-        {
-            asw_wifi_manager(WIFI_JOB_SCAN);
-            sleep(1);
-            asw_wifi_manager(WIFI_JOB_AP);
+            asw_wifi_manager(WIFI_JOB_STA);
+            break;
         }
-        break;
-        }
-        dhcp_ip_config();
+    }
+    else // if (g_stick_run_mode != Work_Mode_LAN)
+    {
+        g_stick_run_mode = Work_Mode_LAN;
+        printf("\n =====  Lan-ETH is checked !!! ===== \n");
+        asw_wifi_manager(WIFI_JOB_SCAN);
         sleep(1);
+        asw_wifi_manager(WIFI_JOB_AP_SCAN);
     }
 }
 
@@ -987,25 +1384,27 @@ void asw_net_stop(void)
 void net_http_server_start(void *pvParameters)
 {
 
-    // xSemaphoreHandle *server_ready = pvParameters;
+    xSemaphoreHandle *server_ready = pvParameters;
     asw_net_start();
 
     start_webserver();
 
     // ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &asw_ip_event_handler, NULL, &instance_ip_event_any_id));
     // ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &asw_wifi_event_handler, NULL, &instance_wifi_event_any_id));
-    // int ret = esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_CONNECTED, esp_netif_action_connected, s_asw_esp_netif);
-    // if (ret != ESP_OK)
-    // {
-    //     ESP_LOGE(TAG, "error register  eth  connect!!");
-    // }
+    // ESP_ERROR_CHECK(esp_event_handler_instance_register(ETH_EVENT, ESP_EVENT_ANY_ID, &asw_eth_event_handler, NULL, &instance_eth_event_any_id));
 
-    // ret = esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_DISCONNECTED, esp_netif_action_disconnected, s_asw_esp_netif);
-    // if (ret != ESP_OK)
-    // {
-    //     ESP_LOGE(TAG, "error register  eth disconnect!!");
-    // }
+    int ret = esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_CONNECTED, esp_netif_action_connected, s_asw_esp_netif);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "error register  eth  connect!!");
+    }
 
-    // xSemaphoreGive(*server_ready);
+    ret = esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_DISCONNECTED, esp_netif_action_disconnected, s_asw_esp_netif);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "error register  eth disconnect!!");
+    }
+
+    xSemaphoreGive(*server_ready);
     ASW_LOGW("net http server start finished!!");
 }

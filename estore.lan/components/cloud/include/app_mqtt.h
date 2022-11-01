@@ -8,6 +8,7 @@
 
 #include "esp32_time.h"
 #include "meter.h"
+#include "http_client.h"
 #include "asw_modbus.h"
 #include "wifi_sta_server.h"
 

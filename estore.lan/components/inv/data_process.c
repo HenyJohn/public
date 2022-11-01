@@ -1,13 +1,5 @@
 #include "data_process.h"
 
-
-
-/** dan.wang 2022.10.28 */
-char is_in_cloud_main_loop = 0;
-cld_rrpc_resp_t cld_resp_var = {0};
-int rrpc_resp_concel = 0;
-
-
 //--- Eng.Stg.Mch  ---//
 ScheduleBat g_schedule_bat = {0}; // LanStick-MulitilInv -
 Bat_Monitor_arr_t g_monitor_para = {0};

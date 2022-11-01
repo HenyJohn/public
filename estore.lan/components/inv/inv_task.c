@@ -13,7 +13,7 @@ void inv_task(void *pvParameters)
 
     ASW_LOGW("inv task start..");
 
-    if (serialport_init(MAIN_UART) == 0)
+    if (serialport_init(INV_UART) == 0)
     {
         ESP_LOGI(TAG, "inv uart ini ok ");
     }
@@ -67,7 +67,6 @@ void inv_task(void *pvParameters)
             break;
 #endif
         default:
-
             task_state = TASK_IDLE;
             break;
         }

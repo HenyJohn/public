@@ -32,7 +32,12 @@
 
 //-----------------------------------//
 
-
+typedef enum
+{
+    MAIN_UART = 0,
+    INV_UART = 1,
+    ATE_UART = 2
+} UART_TYPE;
 
 //-----------------------------------//
 
@@ -57,9 +62,10 @@ extern int inv_comm_error;
 
 extern int inv_com_reboot_flg;
 
+
 int last_com_data(unsigned int index);
 
-int8_t serialport_init(int type);
+int8_t serialport_init(UART_TYPE type);
 int chk_msg(cloud_inv_msg *trans_data);
 
 uint8_t load_reg_info(void);
@@ -84,7 +90,7 @@ SERIAL_STATE inv_task_schedule(char *func, cloud_inv_msg *data);
 SERIAL_STATE query_data_proc();
 SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data);
 SERIAL_STATE scan_register(void);
-SERIAL_STATE ssc_send_meterdata_proc(void); // SSC
+SERIAL_STATE ssc_send_meterdata_proc(void);  //SSC 
 
 int8_t recv_bytes_frame_waitting_nomd(int fd, uint8_t *res_buf, uint16_t *res_len);
 
@@ -103,5 +109,7 @@ void cld_idle_work(void);
 int get_cld_inv_arr_first(void);
 
 int asw_inv_data_init();
+
+int asw_is_safety_96_97(void);
 
 #endif

@@ -32,7 +32,7 @@ uint32_t get_time(char *p_date, int len)
 {
     time_t t = time(0);
     // struct tm currtime = {0};
-       strftime(p_date, len, "%Y-%m-%d %H:%M:%S", localtime(&t));//[tgl update]change
+    strftime(p_date, len, "%Y-%m-%d %H:%M:%S", localtime(&t)); //
     // strftime(p_date, len, "%Y-%m-%d %H:%M:%S", localtime_r(&t, &currtime));
     return (uint32_t)t;
 }
@@ -110,7 +110,7 @@ void set_time_cgi(char *str)
             settimeofday(&tv, NULL);
             memset(buf, 0, 20);
             get_time(buf, 20);
-            ESP_LOGI(TAG,"after set: %s\n", buf);
+            ESP_LOGI(TAG, "after set: %s\n", buf);
         }
     }
 }
@@ -152,11 +152,11 @@ int StrToHex(unsigned char *pbDest, char *pbSrc, int srcLen)
 int HexToStr(unsigned char *pbDest, unsigned char *pbSrc, int srcLen)
 {
     int i;
-     char tmp[3] = {0};
+    char tmp[3] = {0};
     for (i = 0; i < srcLen; i++)
     {
-       memset(tmp,0,sizeof(tmp));
-                // char tmp[2] = {0};
+        memset(tmp, 0, sizeof(tmp));
+        // char tmp[2] = {0};
         sprintf(tmp, "%02x", pbSrc[i]);
         pbDest[i * 2] = tmp[0];
         pbDest[i * 2 + 1] = tmp[1];
@@ -186,11 +186,11 @@ void factory_initial(void)
 {
     clear_file_system();
     factory_reset_nvs();
-        ESP_LOGW(TAG," will restart by [facotry initial]");
+    ESP_LOGW(TAG, " will restart by [facotry initial]");
 
     esp_restart();
 }
-//---------------------------------------------//
+//---------------------------------------------//query_meter_proc--->
 void esp32_wifinvs_clear(void)
 {
     printf("delet wifiphy data");
@@ -226,6 +226,76 @@ int getJsonNum(int *dest, char *name, cJSON *json)
     return -1;
 }
 
+int getJsonNumU8(void *dest, char *name, cJSON *json)
+{
+    const cJSON *item = NULL;
+    item = cJSON_GetObjectItemCaseSensitive(json, name);
+    if (cJSON_IsNumber(item))
+    {
+        *(uint8_t *)dest = item->valueint;
+        return 0;
+
+        // ASW_LOGW("---888***&&&& tgl debug print: get value :%d",item->valueint);
+    }
+    return -1;
+}
+
+int getJsonNumU16(void *dest, char *name, cJSON *json)
+{
+    const cJSON *item = NULL;
+    item = cJSON_GetObjectItemCaseSensitive(json, name);
+    if (cJSON_IsNumber(item))
+    {
+        *(uint16_t *)dest = item->valueint;
+        return 0;
+
+        // ASW_LOGW("---888***&&&& tgl debug print: get value :%d",item->valueint);
+    }
+    return -1;
+}
+
+int getJsonNumU32(void *dest, char *name, cJSON *json)
+{
+    const cJSON *item = NULL;
+    item = cJSON_GetObjectItemCaseSensitive(json, name);
+    if (cJSON_IsNumber(item))
+    {
+        *(uint32_t *)dest = item->valueint;
+        return 0;
+
+        // ASW_LOGW("---888***&&&& tgl debug print: get value :%d",item->valueint);
+    }
+    return -1;
+}
+
+int getJsonNumS8(void *dest, char *name, cJSON *json)
+{
+    const cJSON *item = NULL;
+    item = cJSON_GetObjectItemCaseSensitive(json, name);
+    if (cJSON_IsNumber(item))
+    {
+        *(int8_t *)dest = item->valueint;
+        return 0;
+
+        // ASW_LOGW("---888***&&&& tgl debug print: get value :%d",item->valueint);
+    }
+    return -1;
+}
+
+int getJsonNumS16(void *dest, char *name, cJSON *json)
+{
+    const cJSON *item = NULL;
+    item = cJSON_GetObjectItemCaseSensitive(json, name);
+    if (cJSON_IsNumber(item))
+    {
+        *(int16_t *)dest = item->valueint;
+        return 0;
+
+        // ASW_LOGW("---888***&&&& tgl debug print: get value :%d",item->valueint);
+    }
+    return -1;
+}
+
 /************************************************/
 void int_2_str(int x, char *s, int s_len)
 {
@@ -245,4 +315,3 @@ void add_str_to_json(cJSON *res, char *tag_name, char *val)
     cJSON_AddStringToObject(res, tag_name, val);
 }
 //----------------------------------//
-  

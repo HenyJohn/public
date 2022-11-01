@@ -517,7 +517,7 @@ int read_lost_index(void)
     i = fread(buff, sizeof(char), 32, fp);
     ESP_LOGE("read index", "all read*%d#%s#--- ", i, buff);
     fclose(fp);
-
+    
     tmp_index = atoi(buff);
     ESP_LOGE("read index", "read index is %d \n", tmp_index);
     if (tmp_index < 8000)
@@ -678,6 +678,18 @@ int network_log(char *msg)
     char buf[300] = {0};
 
     get_time(now_time, sizeof(now_time));
+    if (g_stick_run_mode == Work_Mode_AP_PROV)
+        sprintf(buf, "%s ip:%s %s\r\n", now_time, "160.190.0.1", msg);
+    else if (g_stick_run_mode == Work_Mode_LAN)
+    {
+        get_eth_ip(ip);
+        sprintf(buf, "%s ip:%s %s\r\n", now_time, ip, msg);
+    }
+    else if (g_stick_run_mode == Work_Mode_STA)
+    {
+        get_sta_ip(ip);
+        sprintf(buf, "%s ip:%s %s\r\n", now_time, ip, msg);
+    }
 
     if (strlen(net_log.tag) == 0)
         memcpy(net_log.tag, "Internet info\r\n", strlen("Internet info\r\n"));

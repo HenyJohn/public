@@ -16,6 +16,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include "mqtt_client.h"
 #include "esp_tls.h"
 #include "aiot_mqtt_sign.h"
 
@@ -56,6 +57,9 @@ extern char DEMO_DEVICE_NAME[IOTX_DEVICE_NAME_LEN + 1];
 //--------------------------//
 int asw_mqtt_setup(void);
 
+void asw_mqtt_client_stop();
+void asw_mqtt_client_start();
+
 void set_mqtt_server(char *pdk, char *server, int port);
 // void set_mqtt_server(char *server,int port);
 
@@ -65,10 +69,13 @@ void set_device_secret(char *device_secret);
 int asw_publish(void *cpayload);
 int sent_newmsg(void);
 int mqtt_app_start(void);
+void mqtt_client_destroy_free(void);
 int parse_mqtt_msg(char *payload);
 int asw_mqtt_publish(const char *topic, const char *data, int data_len, int qos);
 
 void send_msg(int type, char *buff, int lenthg, char *ws);
+
+int get_mqtt_pub_ack(void);
 
 void asw_mqtt_client_stop(void);
 

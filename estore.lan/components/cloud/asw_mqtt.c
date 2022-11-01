@@ -9,11 +9,10 @@
 #include "asw_mqtt.h"
 #include "utility.h"
 #include "estore_cld.h"
-#include "cat1.h"
 
 //------------------------------------------//
 int netework_state = 1;
-
+static int8_t asw_mqtt_app_state_code = -1; //-1-无状态，1-初始完毕，2-connect,3-disconnet,4-stop,5-free
 
 static const char *TAG = "asw_mqtt.c";
 char pub_topic[150] = "/a1tqX123itk/B80052030075/user/Action";
@@ -33,11 +32,13 @@ char DEMO_PRODUCT_KEY[IOTX_PRODUCT_KEY_LEN + 1] = "a1tqX123itk";
 char DEMO_DEVICE_NAME[IOTX_DEVICE_NAME_LEN + 1] = "B80052030075";
 char DEMO_DEVICE_SECRET[IOTX_DEVICE_SECRET_LEN + 1] = "VrRCgge0PTkZesAVyGguPJrMIA4Tr4ME"; //"JDuE0bUeFjcfQucPtvnJEk5vcVcD5E2L";
                                                                                           //"VrRCgge0PTkZesAVyGguPJrMIA4Tr4ME";
+static esp_mqtt_client_handle_t asw_mqtt_client = NULL;
+//------------------------------------------//
 
 void set_mqtt_server(char *pdk, char *server, int port)
 {
     snprintf(my_uri, sizeof(my_uri), "mqtts://%s.iot-as-mqtt.%s.aliyuncs.com:%d", pdk, server, port);
-    ESP_LOGI(TAG, "mqtt server %s \n", my_uri);
+    ASW_LOGI("mqtt server %s \n", my_uri);
 }
 
 // void set_mqtt_server(char *server, int port)
@@ -82,7 +83,7 @@ void newparaget(void)
     Setting_Para setting = {0};
 
     general_query(NVS_ATE, &setting);
-    ESP_LOGE("ATE", "para get %d %d \n", setting.meter_add, setting.typ);
+    ASW_LOGI("para get %d %d \n", setting.meter_add, setting.typ);
     cJSON_AddStringToObject(res, "psn", setting.psn);
     cJSON_AddStringToObject(res, "key", setting.reg_key);
     cJSON_AddNumberToObject(res, "typ", setting.typ);
@@ -106,7 +107,7 @@ void newparaget(void)
     cJSON_AddNumberToObject(res, "meter_mod", setting.meter_mod);
 
     msg = cJSON_PrintUnformatted(res);
-    printf("newsss set: %s\n", msg);
+    ASW_LOGI("newsss set: %s\n", msg);
 
     cJSON_Delete(res);
     free(msg); // [tgl mark]add
@@ -121,7 +122,7 @@ void setting_new_server(cJSON *body)
     Setting_Para setting = {0};
 
     general_query(NVS_ATE, &setting);
-    ESP_LOGI("ATE", "org para %d %d \n", setting.meter_add, setting.typ);
+    ASW_LOGI("org para %d %d \n", setting.meter_add, setting.typ);
     cJSON_AddStringToObject(res, "psn", setting.psn);
     cJSON_AddStringToObject(res, "key", setting.reg_key);
     cJSON_AddNumberToObject(res, "typ", setting.typ);
@@ -144,10 +145,10 @@ void setting_new_server(cJSON *body)
     cJSON_AddNumberToObject(res, "meter_mod", setting.meter_mod);
 
     msg = cJSON_PrintUnformatted(res);
-    printf("org set: %s\n", msg);
+    ASW_LOGI("org set: %s\n", msg);
 
     cJSON *json;
-    printf("new server setting %s\n", (char *)body);
+    ASW_LOGI("new server setting %s\n", (char *)body);
     json = body; // cJSON_Parse(body);
     if (json == NULL)
         return; //// return -1; [tgl mark]
@@ -185,12 +186,12 @@ void send_msg(int type, char *buff, int lenthg, char *ws)
     buf.type = type;
     buf.len = lenthg;
 
-    ESP_LOGI(TAG, "send msg %s %d \n", buf.data, lenthg);
+    ASW_LOGI("send msg %s %d \n", buf.data, lenthg);
     // ret = msgsnd(id, &buf, sizeof(buf.data), 0);
     if (mq1 != NULL)
     {
         xQueueSend(mq1, (void *)&buf, (TickType_t)0);
-        ESP_LOGI(TAG, "send cloud msg ok\n");
+        ASW_LOGI("send cloud msg ok\n");
     }
 }
 
@@ -201,7 +202,7 @@ int sent_newmsg(void)
     char msg[32] = {0};
     memset(ws, 'U', 64);
     msg[0] = 0;
-    ESP_LOGI(TAG, "rebootms %d ws %s \n", msg[0], ws);
+    ASW_LOGI("rebootms %d ws %s \n", msg[0], ws);
     send_msg(99, msg, 1, ws);
     return 0;
 }
@@ -210,9 +211,9 @@ int sent_newmsg(void)
 
 int asw_mqtt_setup(void)
 {
-    ESP_LOGI(TAG, "[APP] Startup..");
-    ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
+    ASW_LOGI("[APP] Startup..");
+    ASW_LOGI("[APP] Free memory: %d bytes", esp_get_free_heap_size());
+    ASW_LOGI("[APP] IDF version: %s", esp_get_idf_version());
 
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
@@ -223,13 +224,19 @@ int asw_mqtt_setup(void)
     esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
 
     aiotMqttSign(DEMO_PRODUCT_KEY, DEMO_DEVICE_NAME, DEMO_DEVICE_SECRET, client_id, username, password);
-    ESP_LOGI(TAG, "[client_id] %s\n", client_id);
-    ESP_LOGI(TAG, "[username] %s\n", username);
-    ESP_LOGI(TAG, "[password] %s\n", password);
+    ASW_LOGI("[client_id] %s\n", client_id);
+    ASW_LOGI("[username] %s\n", username);
+    ASW_LOGI("[password] %s\n", password);
 
     return 0;
 }
+//=================================//
+int get_mqtt_pub_ack(void)
+{
+    return mqtt_pub_res;
+}
 
+//---------------------------------//
 int parse_mqtt_msg(char *payload)
 {
     cJSON *json = NULL;
@@ -239,11 +246,11 @@ int parse_mqtt_msg(char *payload)
 
     if (cmd_ == NULL || cmd_->type == cJSON_NULL)
     {
-        printf("mqtt msg can't found Action \n");
+        ESP_LOGW(TAG, "mqtt msg can't found Action \n");
         return -1;
     }
     char *function = cJSON_GetObjectItem(json, "Action")->valuestring;
-    printf("ACTION STR %s \n", function);
+    ASW_LOGI("ACTION STR %s \n", function);
     if (function != NULL)
     {
         //{"Action":"setscan","value":{"setscan":15}}
@@ -254,12 +261,12 @@ int parse_mqtt_msg(char *payload)
             unsigned int cnt = 0;
             cJSON *item = cJSON_GetObjectItem(json, "value");
 
-            printf("cnt int %d \n", cJSON_GetObjectItem(item, "setscan")->valueint);
+            ASW_LOGI("cnt int %d \n", cJSON_GetObjectItem(item, "setscan")->valueint);
 
             cnt = cJSON_GetObjectItem(item, "setscan")->valueint;
             int byteLen = 1;
             u8msg[0] = cnt;
-            printf("cnt int %d  %s\n", cnt, u8msg);
+            ASW_LOGI("cnt int %d  %s\n", cnt, u8msg);
             send_msg(5, u8msg, byteLen, NULL);
         }
         else if (!(strcmp(function, "Full-Trans")))
@@ -271,7 +278,7 @@ int parse_mqtt_msg(char *payload)
             item = cJSON_GetObjectItem(json, "message");
             strncpy(msg, item->valuestring, 300);
 
-            printf("ms %s ws %s \n", msg, ws);
+            ASW_LOGI("ms %s ws %s \n", msg, ws);
             send_msg(2, msg, strlen(msg), ws);
         }
         else if (!(strcmp(function, "reboot"))) // 0, esp32;1,inv
@@ -284,7 +291,7 @@ int parse_mqtt_msg(char *payload)
             // strncpy(msg, item->valuestring, 300);
             memset(ws, 'T', 64);
             msg[0] = cJSON_GetObjectItem(json, "reboot")->valueint;
-            printf("ms %d ws %s \n", msg[0], ws);
+            ASW_LOGI("ms %d ws %s \n", msg[0], ws);
             send_msg(99, msg, 1, ws);
         }
         else if (!(strcmp(function, "setmeter")))
@@ -292,8 +299,8 @@ int parse_mqtt_msg(char *payload)
             cJSON *meter = cJSON_GetObjectItem(json, "value");
             tmp_int = 0;
             // cJSON_AddNumberToObject(meter, "date", get_current_days());
-            // printf("meter set %s \n", cJSON_PrintUnformatted(cJSON_GetObjectItem(json, "value")));
-            printf("meter set %s \n", cJSON_PrintUnformatted(meter));
+            // ASW_LOGI("meter set %s \n", cJSON_PrintUnformatted(cJSON_GetObjectItem(json, "value")));
+            ASW_LOGI("meter set %s \n", cJSON_PrintUnformatted(meter));
 
             // Eng.Stg.Mch-lanstick 20220908 +-
             //  meter_setdata mt = {0};
@@ -344,59 +351,34 @@ int parse_mqtt_msg(char *payload)
 
 #endif
 
-            // int abs0 = 0;
-            // int offs = 0;
-            // getJsonNum(&abs0, "abs", meter);
-            // printf("abs0: %d\n", abs0);
-            // getJsonNum(&offs, "offset", meter);
-            // printf("offs: %d\n", offs);
-
-            // if (mt.reg == 10)
-            // {
-            //     mt.reg = 0X100;
-            //     if (abs0 == 1 && mt.adv.meter_target == 0)
-            //     {
-            //         if (offs <= 0 || offs > 100)
-            //             offs = 5;
-
-            //         mt.adv.meter_target |= offs;
-            //     }
-            // }
-
             mt.adv.meter_day = get_current_days();
-#if DEBUG_PRINT_ENABLE
-            printf("\n------------parse_mqtt_msg ----------- set meter -----\n  ");
-            printf("meter_enb:%d ,meter_mod:%d,meter_regulate:%d,meter_target:%d",
-                   mt.adv.meter_enb, mt.adv.meter_mod, mt.adv.meter_regulate, mt.adv.meter_target);
+            ASW_LOGI("meter_enb:%d ,meter_mod:%d,meter_regulate:%d,meter_target:%d",
+                     mt.adv.meter_enb, mt.adv.meter_mod, mt.adv.meter_regulate, mt.adv.meter_target);
 
-            printf("\n------------parse_mqtt_msg ----------- set meter -----\n  ");
-#endif
             // Eng.Stg.Mch-lanstick 20220908 +-
             write_global_var_to_nvs(METER_CONTROL_CONFIG, &mt);
-            event_group_0 |= METER_CONFIG_MASK;
-            event_group_0 |= PWR_REG_SOON_MASK;
             g_meter_sync = 0;
-            sleep(1);
 
-            // write_meter_file(&mt);
-            // sleep(1);
-            // send_msg(6, "clearmeter", 9, NULL);
-            // esp_restart();
-            // write_meter_file(cJSON_PrintUnformatted(meter));
+            event_group_0 |= PWR_REG_SOON_MASK;
+            /*根据调试打印设置值，判断是否进行数据打印*/
+            if (g_asw_debug_enable > 1)
+                event_group_0 |= METER_CONFIG_MASK;
+
+            sleep(1);
         }
         else if (!(strcmp(function, "upgrade")))
         {
             cJSON *item = cJSON_GetObjectItem(json, "value");
             char up_type = cJSON_GetObjectItem(item, "type")->valueint;
-            printf("update type %d \n", up_type);
+            ASW_LOGI("update type %d \n", up_type);
 
             cJSON *item1 = cJSON_GetObjectItem(item, "path");
             char *url0 = cJSON_GetObjectItem(item1, "directory")->valuestring;
-            printf("url %s \n", url0);
+            ASW_LOGI("url %s \n", url0);
 
             cJSON *item2 = cJSON_GetObjectItem(item1, "files");
-            printf("file type %d %d \n", item2->type, cJSON_GetArraySize(item2));
-            printf("meter str %s \n", cJSON_GetArrayItem(item2, 0)->valuestring);
+            ASW_LOGI("file type %d %d \n", item2->type, cJSON_GetArraySize(item2));
+            ASW_LOGI("meter str %s \n", cJSON_GetArrayItem(item2, 0)->valuestring);
             char *p[cJSON_GetArraySize(item2)];
 
             update_url download_url = {0};
@@ -417,7 +399,7 @@ int parse_mqtt_msg(char *payload)
                 }
             }
 
-            printf("dowan_loadurl %s  %d %d\n", download_url.down_url, download_url.update_type, strlen(download_url.down_url));
+            ASW_LOGI("dowan_loadurl %s  %d %d\n", download_url.down_url, download_url.update_type, strlen(download_url.down_url));
 
             TaskHandle_t download_task_handle = NULL;
             BaseType_t xReturned;
@@ -438,7 +420,7 @@ int parse_mqtt_msg(char *payload)
         {
             cJSON *new_server = cJSON_GetObjectItem(json, "value");
 
-            ESP_LOGI(TAG, "get sub newset %s \n", cJSON_PrintUnformatted(new_server));
+            ASW_LOGI("get sub newset %s \n", cJSON_PrintUnformatted(new_server));
 
             setting_new_server(new_server); //[tgl mark] define in the ATE
 
@@ -456,6 +438,36 @@ int parse_mqtt_msg(char *payload)
     }
 
     return 0;
+}
+
+void mqtt_client_destroy_free(void)
+{
+    if (asw_mqtt_client != NULL && asw_mqtt_app_state_code != 5)
+    {
+        ESP_LOGE(TAG, "mqtt_client_destroy_free  state is %d\n", asw_mqtt_app_state_code);
+        esp_mqtt_client_stop(asw_mqtt_client); // tgl add ++
+        esp_mqtt_client_destroy(asw_mqtt_client);
+        g_state_mqtt_connect = -1;
+        netework_state = 1;
+
+        asw_mqtt_app_state_code = 5; //-1-无状态，1-初始完毕，2-connect,3-disconnet,4-stop,5-free
+    }
+}
+
+//[tgl lan]add
+void asw_mqtt_client_stop()
+{
+    if (asw_mqtt_client != NULL && asw_mqtt_app_state_code != 4)
+    {
+        ESP_LOGE(TAG, "mqtt_client_stop \n");
+        // esp_mqtt_client_stop(asw_mqtt_client);
+        esp_mqtt_client_stop(asw_mqtt_client);
+
+        g_state_mqtt_connect = -1;
+        netework_state = 1;
+
+        asw_mqtt_app_state_code = 4; //-1-无状态，1-初始完毕，2-connect,3-disconnet,4-stop,5-free
+    }
 }
 
 int replace_string(char *str, char *outstr, char *oldstr, char *newstr)
@@ -492,7 +504,7 @@ int get_rrpc_restopic(char *rpc_topic, int rpc_len, char *response_topic)
 
     memcpy(resp_topicx, rpc_topic, rpc_len);
     replace_string(resp_topicx, resp_topic, "request", "response");
-    printf("response publish %s\n", resp_topic);
+    ASW_LOGI("response publish %s\n", resp_topic);
     // res=asw_mqtt_publish(resp_topic, (uint8_t *)payload, strlen(payload), 0);
     memcpy(response_topic, resp_topic, strlen(resp_topic));
     return 0;
@@ -514,13 +526,13 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
     char resp_topic[256] = {0};
     if (get_rrpc_restopic(rpc_topic, rpc_len, resp_topic) < 0)
     {
-        printf("mqtt rrpc topic too long \n");
+        ESP_LOGW(TAG, "mqtt rrpc topic too long \n");
         asw_mqtt_publish(resp_topic, (char *)recv_er, strlen(recv_er), 0);
         if (json != NULL)
             cJSON_Delete(json);
         return -1;
     }
-    printf("RRPC ACTION STR \n"); // item = cJSON_GetObjectItem(root, "semantic");
+    ASW_LOGI("RRPC ACTION STR \n"); // item = cJSON_GetObjectItem(root, "semantic");
     // char *function = cJSON_GetObjectItem(json, "setscan")->valueint;
 
     if (cJSON_HasObjectItem(json, "setscan") == 1 && cJSON_GetObjectItem(json, "setscan")->valueint > 0)
@@ -531,7 +543,7 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
 
         int byteLen = 1;
         u8msg[0] = cnt;
-        printf("cnt int %d  %s\n", cnt, u8msg);
+        ASW_LOGI("cnt int %d  %s\n", cnt, u8msg);
         send_msg(5, u8msg, byteLen, NULL);
         asw_mqtt_publish(resp_topic, (char *)recv_ok, strlen(recv_ok), 0); // res scan
         // return 0;
@@ -544,7 +556,7 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
         memset(ws, 'R', 64);
         strncpy(msg, cJSON_GetObjectItem(json, "fdbg")->valuestring, 300);
 
-        printf("ms %s ws %s \n", msg, ws);
+        ASW_LOGI("ms %s ws %s \n", msg, ws);
         memcpy(rrpc_res_topic, resp_topic, strlen(resp_topic));
         send_msg(2, msg, strlen(msg), ws);
         // return 0;
@@ -558,7 +570,7 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
         memset(ws, 'U', 64);
         // strncpy(msg, cJSON_GetObjectItem(json, "fdbg")->valuestring, 300);
         msg[0] = cJSON_GetObjectItem(json, "reboot")->valueint;
-        printf("ms %d ws %s \n", msg[0], ws);
+        ASW_LOGI("ms %d ws %s \n", msg[0], ws);
         // memcpy(rrpc_res_topic, resp_topic, strlen(resp_topic));
         send_msg(99, msg, 1, ws);
         asw_mqtt_publish(resp_topic, (char *)recv_ok, strlen(recv_ok), 0);
@@ -568,7 +580,7 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
     {
         cJSON *meter = cJSON_GetObjectItem(json, "setmeter");
 
-        printf("meter set %s \n", cJSON_PrintUnformatted(meter));
+        ASW_LOGI("meter set %s \n", cJSON_PrintUnformatted(meter));
 
         // Eng.Stg.Mch-lanstick 20220908 +-
         MonitorPara monitor_para = {0};
@@ -640,7 +652,11 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
 #endif
         monitor_para.adv.meter_day = get_current_days();
         write_global_var_to_nvs(METER_CONTROL_CONFIG, &monitor_para);
-        event_group_0 |= METER_CONFIG_MASK;
+
+        /*根据调试打印设置值，判断是否进行数据打印*/
+        if (g_asw_debug_enable > 1)
+            event_group_0 |= METER_CONFIG_MASK;
+
         event_group_0 |= PWR_REG_SOON_MASK;
         g_meter_sync = 0;
         // send_msg(6, "clearmeter", 9, NULL);
@@ -654,22 +670,22 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
     {
         cJSON *item = cJSON_GetObjectItem(json, "upgrade");
         char up_type = cJSON_GetObjectItem(item, "type")->valueint;
-        printf("update type %d \n", up_type);
+        ASW_LOGI("update type %d \n", up_type);
 
         // p2p dan.wang
         if (cJSON_HasObjectItem(item, "p2p") == 1)
         {
             g_p2p_mode = cJSON_GetObjectItem(item, "p2p")->valueint;
-            printf("p2p %d \n", g_p2p_mode);
+            ASW_LOGI("p2p %d \n", g_p2p_mode);
         }
 
         cJSON *item1 = cJSON_GetObjectItem(item, "path");
         char *url0 = cJSON_GetObjectItem(item1, "directory")->valuestring;
-        printf("url %s \n", url0);
+        ASW_LOGI("url %s \n", url0);
 
         cJSON *item2 = cJSON_GetObjectItem(item1, "files");
-        printf("file type %d %d \n", item2->type, cJSON_GetArraySize(item2));
-        printf("meter str %s \n", cJSON_GetArrayItem(item2, 0)->valuestring);
+        ASW_LOGI("file type %d %d \n", item2->type, cJSON_GetArraySize(item2));
+        ASW_LOGI("meter str %s \n", cJSON_GetArrayItem(item2, 0)->valuestring);
         char *p[cJSON_GetArraySize(item2)];
 
         update_url download_url = {0};
@@ -690,8 +706,8 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
             }
         }
         asw_mqtt_publish(resp_topic, (char *)recv_ok, strlen(recv_ok), 0); // res update
-        printf("dowan_loadurl %s  %d %d\n", download_url.down_url, download_url.update_type, strlen(download_url.down_url));
-        printf("RRPCRESP %s  %s \n", resp_topic, recv_ok);
+        ASW_LOGI("dowan_loadurl %s  %d %d\n", download_url.down_url, download_url.update_type, strlen(download_url.down_url));
+        ASW_LOGI("RRPCRESP %s  %s \n", resp_topic, recv_ok);
 
         TaskHandle_t download_task_handle = NULL;
         BaseType_t xReturned;
@@ -721,6 +737,11 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
         char bufx[100] = {0};
 
         get_time(now_timex, sizeof(now_timex));
+
+        if (g_stick_run_mode == Work_Mode_LAN)
+            get_eth_ip(ipx);
+        else if (g_stick_run_mode == Work_Mode_STA)
+            get_sta_ip(ipx);
         sprintf(bufx, "%s ip:%s ", now_timex, ipx);
 
         asw_mqtt_publish(resp_topic, (char *)bufx, strlen(bufx), 0);
@@ -739,7 +760,7 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
         char buff[1024] = {0};
         // get_sys_log(bufx);
         get_all_log(buff);
-        ESP_LOGI(TAG, "rrpcsyslog %d--%s \n", strlen(buff), buff);
+        ASW_LOGI("rrpcsyslog %d--%s \n", strlen(buff), buff);
 
         if (strlen(buff))
             asw_mqtt_publish(resp_topic, (char *)buff, strlen(buff), 0);
@@ -803,7 +824,7 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
     {
         cJSON *new_server = cJSON_GetObjectItem(json, "setserver");
 
-        printf("new_server set %s \n", cJSON_PrintUnformatted(new_server));
+        ASW_LOGI("new_server set %s \n", cJSON_PrintUnformatted(new_server));
 
         setting_new_server(new_server);
 
@@ -819,7 +840,6 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
         asw_mqtt_publish(resp_topic, (char *)recv_er, strlen(recv_er), 0);
     }
     // RECCCVV DATA={"setserver":{"host":"ap-southeast-1","pdk":"a25dhqu0kTj","sec":"b6517171d7cf1560054cb4be88fec76b",psn:""}}
-    // printf("=========>>>>>>>>>>>>>%d \n", cJSON_HasObjectItem(json, "setserver"));
 
     if (json != NULL)
         cJSON_Delete(json);
@@ -830,51 +850,171 @@ int parse_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int data_le
 //@return: -1 means failure
 int asw_mqtt_publish(const char *topic, const char *data, int data_len, int qos)
 {
-    cat1_mqtt_pub(0, topic, data);
-    // ESP_LOGI(TAG, "published, msg_id=%d ************", msg_id);
-    return 0;
+    int msg_id = 0;
+    msg_id = esp_mqtt_client_publish(asw_mqtt_client, topic, data, data_len, qos, 1);
+    ASW_LOGI("published, msg_id=%d ************", msg_id);
+    return msg_id;
 }
-
+//-------------------------------------//
 int asw_publish(void *cpayload)
 {
     int res = 0;
     char *payload = (char *)cpayload;
 
-    // asw_mqtt_publish(topic, payload, strlen(payload), ini_para.mqtt_qos);
-    res = cat1_mqtt_pub(0, pub_topic, payload);
+    res = asw_mqtt_publish(pub_topic, payload, strlen(payload), 1);
 
     if (res < 0)
     {
-        printf("publish failed, res = %d", res);
+        ESP_LOGE(TAG, "publish failed, res = %d", res);
         return -1;
     }
-    return 0;
+    return res;
 }
+//--------------------------------------
+void asw_mqtt_subscribe_receive(char *topic, int topic_len, char *data, int data_len)
+{
+    ASW_LOGI("RECVVV  TOPIC=%.*s\r\n", topic_len, topic);
+    ASW_LOGI("RECCCVV DATA=%.*s\r\n", data_len, data);
+
+    if (strstr(topic, "rrpc"))
+    {
+        // Eng.Stg.Mch-lanstick
+        if (is_cld_has_estore() == 1)
+        {
+            parse_estore_mqtt_msg_rrpc(topic, topic_len, data, data_len); // int parse_mqtt_msg_rrpc(char * rpc_topic, int rpc_len, void *payload, int data_len)
+        }
+        else
+        {
+            parse_mqtt_msg_rrpc(topic, topic_len, data, data_len); // int parse_mqtt_msg_rrpc(char * rpc_topic, int rpc_len, void *payload, int data_len)
+        }
+    }
+
+    else
+        parse_mqtt_msg(data);
+}
+
+//------------------------------------------//
+static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
+{
+    esp_mqtt_client_handle_t client = event->client;
+    int msg_id;
+    // your_context_t *context = event->context;
+    switch (event->event_id)
+    {
+        // sub:
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+        msg_id = esp_mqtt_client_subscribe(client, sub_topic, 1);
+        ASW_LOGI("sent subscribe successful, msg_id=%d", msg_id);
+
+        msg_id = esp_mqtt_client_subscribe(client, sub_topic_get, 1);
+        ASW_LOGI("sent get subscribe successful, msg_id=%d", msg_id);
+
+        g_state_mqtt_connect = 0;
+        asw_mqtt_app_state_code = 2; //-1-无状态，1-初始完毕，2-connect,3-disconnet,4-stop,5-free
+
+        break;
+
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+        g_state_mqtt_connect = -1;
+        asw_mqtt_app_state_code = 3; //-1-无状态，1-初始完毕，2-connect,3-disconnet,4-stop,5-free
+
+        break;
+
+    case MQTT_EVENT_SUBSCRIBED:
+
+        break;
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        mqtt_pub_res = event->msg_id;
+        break;
+
+        // sub msg recv:
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+
+        asw_mqtt_subscribe_receive(event->topic, event->topic_len, event->data, event->data_len);
+        break;
+    case MQTT_EVENT_ERROR:
+        ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS)
+        {
+            ASW_LOGI("Last error code reported from esp-tls: 0x%x", event->error_handle->esp_tls_last_esp_err);
+            ASW_LOGI("Last tls stack error number: 0x%x", event->error_handle->esp_tls_stack_err);
+        }
+        else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED)
+        {
+            ASW_LOGI("Connection refused error: 0x%x", event->error_handle->connect_return_code);
+        }
+        else
+        {
+            ASW_LOGI("Unknown error type: 0x%x", event->error_handle->error_type);
+        }
+        break;
+    default:
+        ASW_LOGI("Other event id:%d", event->event_id);
+        break;
+    }
+    return ESP_OK;
+}
+//--------------------------------//
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    // ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
+    ASW_LOGI("Event dispatched from event loop base=%s, event_id=%d", base, event_id);
+    mqtt_event_handler_cb(event_data);
+}
+
+//----------------------------------------//
 
 int mqtt_app_start(void)
 {
-    int res = -1;
-    ESP_LOGI(TAG, "[mqtt_app_start] Free memory: %d bytes client_id:%s", esp_get_free_heap_size(), client_id);
+    const esp_mqtt_client_config_t mqtt_cfg = {
+        .uri = my_uri,
+        .cert_pem = (const char *)cert, // MQTT_ROOT_CA_FILENAME, //mqtt_eclipse_org_pem_start,
+        .client_id = client_id,
+        .username = username,
+        .password = password,
 
-    Setting_Para para = {0};
-    general_query(NVS_ATE, &para);
+    };
+    if (strlen(my_uri) == 0)
+    {
+        ESP_LOGW("mqtt app start error", "The server is not setting!!!");
+        return -1;
+    }
+    ESP_LOGI(TAG, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
 
-    if (strlen(para.host) > 0)
-        res = cat1_mqtt_conn(0, para.host, 1883, client_id, username, password);
+    // esp_mqtt_client_handle_t
+    asw_mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
+
+    // asw_mqtt_client = client;
+    esp_mqtt_client_register_event(asw_mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, &asw_mqtt_client);
+
+    asw_mqtt_app_state_code = 0; //-1-无状态，0-初始完毕，1-start， 2-connect,3-disconnet,4-stop,5-free
+
+    ESP_LOGW(TAG, "MQTT CLIENT BEFORE START");
+    int res = esp_mqtt_client_start(asw_mqtt_client);
+    ESP_LOGW(TAG, "-DEBUG PRINT-- MQTT CLIENT BEFORE END ---");
+    if (res == ESP_OK)
+    {
+        return 0;
+    }
     else
-        res = cat1_mqtt_conn(0, "cn-shanghai", 1883, client_id, username, password);
-
-    if (res != 0)
         return -1;
+}
 
-    res = cat1_mqtt_sub(0, sub_topic);
-    if (res != 0)
-        return -1;
-    res = cat1_mqtt_sub(0, sub_topic_get);
-    if (res != 0)
-        return -1;
-    g_state_mqtt_connect = 0;
+void asw_mqtt_client_start()
+{
+    if (g_state_mqtt_connect == -1 && asw_mqtt_app_state_code != 1)
+    {
+        ESP_LOGW(TAG, "mqtt client start");
 
-    cat1_set_mqtt_ok(0);
-    return 0;
+        mqtt_app_start();
+        asw_mqtt_app_state_code = 1;
+    }
 }

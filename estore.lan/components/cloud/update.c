@@ -99,21 +99,41 @@ rst_code zs_write_start_frame(uint8_t *data_ptr, uint32_t w_len)
 
     data_ptr[len++] = (unsigned char)((sum >> 8) & 0xff); // check sum high
     data_ptr[len++] = (unsigned char)(sum & 0xff);        // check sum low
-    uart_write_bytes(UART_NUM_1, data_ptr, len);
-    printf("start frame:\n");
-    for (i = 0; i < len; i++)
+
+    /////////////////////////////////////
+    if (g_asw_debug_enable == 1)
     {
-        printf("<%02X>", data_ptr[i]);
+        ESP_LOGI("-S-", "send: scan start... ");
+
+        for (uint8_t i = 0; i < len; i++)
+        {
+            printf("<%02X> ", data_ptr[i]);
+        }
+        printf("\n");
     }
-    printf("\n");
+
+    ////////////////////////////////////
+    uart_write_bytes(UART_NUM_1, data_ptr, len);
+
     if (p2p_upgrade_inv_enable == 0)
         return 0;
     else
     {
         uint8_t res_buf[256] = {0};
         uint16_t res_len = 0;
-        // int res ;
+
         recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+        //////////////////////////////////////
+        if (g_asw_debug_enable == 1)
+        {
+            ESP_LOGI("-R-", "receive scan...");
+            for (uint8_t i = 0; i < res_len; i++)
+            {
+                printf("*%02X ", res_buf[i]);
+            }
+            printf("\n");
+        }
+        ////////////////////////////////////
         if (check_sum(res_buf, res_len) == 0 && res_len >= 13)
         {
             if (res_buf[6] == 0x14 && res_buf[7] == 0x81 && memcmp(res_buf + 2, data_ptr + 4, 2) == 0)
@@ -159,15 +179,21 @@ rst_code zs_write_data_frame(uint8_t *data_ptr, uint32_t w_len)
 
     data_ptr[len++] = (unsigned char)((sum >> 8) & 0xff); // check sum high
     data_ptr[len++] = (unsigned char)(sum & 0xff);        // check sum low
-    uart_write_bytes(UART_NUM_1, data_ptr, len);
+
     // #if DEBUG_PRINT_ENABLE
-    printf("data frame:\n");
-    for (i = 0; i < len; i++)
+    if (g_asw_debug_enable == 1)
     {
-        printf("<%02X>", data_ptr[i]);
+        ESP_LOGI("-S-", "send scan cmd...\n");
+        for (i = 0; i < len; i++)
+        {
+            printf("<%02X>", data_ptr[i]);
+        }
+        printf("\n");
     }
-    printf("\n");
+
     // #endif
+    uart_write_bytes(UART_NUM_1, data_ptr, len);
+
     if (p2p_upgrade_inv_enable == 0)
         return 0;
     else
@@ -176,6 +202,18 @@ rst_code zs_write_data_frame(uint8_t *data_ptr, uint32_t w_len)
         uint16_t res_len = 0;
         // int res ;
         recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+
+        //////////////////////////////////////
+        if (g_asw_debug_enable == 1)
+        {
+            ESP_LOGI("-R-", "receive scan...\n");
+            for (uint8_t i = 0; i < res_len; i++)
+            {
+                printf("*%02X ", res_buf[i]);
+            }
+            printf("\n");
+        }
+        ////////////////////////////////////
         if (check_sum(res_buf, res_len) == 0 && res_len >= 15)
         {
             if (res_buf[6] == 0x14 && res_buf[7] == 0x82 && memcmp(res_buf + 2, data_ptr + 4, 2) == 0)
@@ -219,15 +257,20 @@ rst_code zs_write_end_frame(uint8_t *data_ptr, uint32_t w_len)
     data_ptr[len++] = (unsigned char)((sum >> 8) & 0xff); // check sum high
     data_ptr[len++] = (unsigned char)(sum & 0xff);        // check sum low
 
-    uart_write_bytes(UART_NUM_1, data_ptr, len);
     // #if DEBUG_PRINT_ENABLE
-    printf("end frame:\n");
-    for (i = 0; i < len; i++)
+    if (g_asw_debug_enable == 1)
     {
-        printf("<%02X>", data_ptr[i]);
+        ESP_LOGI("-S-", "send scan getsn cmd...\n");
+        for (i = 0; i < len; i++)
+        {
+            printf("<%02X>", data_ptr[i]);
+        }
+        printf("\n");
     }
-    printf("\n");
+
     // #endif
+
+    uart_write_bytes(UART_NUM_1, data_ptr, len);
 
     if (p2p_upgrade_inv_enable == 0)
         return 0;
@@ -236,6 +279,17 @@ rst_code zs_write_end_frame(uint8_t *data_ptr, uint32_t w_len)
         uint8_t res_buf[256] = {0};
         uint16_t res_len = 0;
         int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+        //////////////////////////////////////
+        if (g_asw_debug_enable == 1)
+        {
+            ESP_LOGI("-R-", "receive scan...\n");
+            for (uint8_t i = 0; i < res_len; i++)
+            {
+                printf("*%02X ", res_buf[i]);
+            }
+            printf("\n");
+        }
+        ////////////////////////////////////
         switch (inv_upgrade_file_type)
         {
         case 1: // master
@@ -327,15 +381,18 @@ rst_code zs_set_inv_baudrate(/*int fd,*/ unsigned char *data_ptr, unsigned short
     data_ptr[len++] = (unsigned char)(sum & 0xff);        // check sum low
 
     uart_write_bytes(UART_NUM_1, data_ptr, len);
-#if DEBUG_PRINT_ENABLE
-    printf("end frame:\n");
-    for (i = 0; i < len; i++)
+    ////////////////////////////////////
+    if (g_asw_debug_enable == 1)
     {
-        printf("<%02X>", data_ptr[i]);
+        ESP_LOGI("-S-", "send scan cmdEnd...:\n");
+        for (i = 0; i < len; i++)
+        {
+            printf("<%02X>", data_ptr[i]);
+        }
+        printf("\n");
     }
-    printf("\n");
+    ////////////////////////////////////
 
-#endif
     if (p2p_upgrade_inv_enable == 0)
         return 0;
     else
@@ -344,6 +401,17 @@ rst_code zs_set_inv_baudrate(/*int fd,*/ unsigned char *data_ptr, unsigned short
         uint16_t res_len = 0;
         // int res ;
         recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+        //////////////////////////////////////
+        if (g_asw_debug_enable == 1)
+        {
+            ESP_LOGI("-R-", "receive scan...\n");
+            for (uint8_t i = 0; i < res_len; i++)
+            {
+                printf("*%02X ", res_buf[i]);
+            }
+            printf("\n");
+        }
+        ////////////////////////////////////
 
         if (check_sum(res_buf, res_len) == 0 && res_len >= 13)
         {
@@ -376,7 +444,7 @@ int get_update_file_name(char *url, char *file_name)
     for (i = strlen(url); i > 0; i--)
         if (url[i - 1] == '/')
         {
-            ESP_LOGI(TAG, "%d name %s \n", i, &url[i]);
+            ASW_LOGI("%d name %s \n", i, &url[i]);
             memcpy(savename, &url[i], strlen(url) - i);
             break;
         }
@@ -535,7 +603,7 @@ void update_inv_broadcast(char *inv_fw_path)
 
         if (info.file_type < 3)
         {
-            printf("Upgrade inv end Wait 60S for INV to restart\r\n");
+            ESP_LOGI("-- UpLoad Inv Finished ---","Upgrade inv end Wait 60S for INV to restart\r\n");
             sleep(60);
             esp_restart();
             //: TODO REBOOT 添加wifistick重启在这里
@@ -881,12 +949,15 @@ void trans_file_to_gd32_broadcast(char *inv_fw_path, char slave_id)
         buffer[len] = (crc >> 8) & 0xFF;
         len++;
 
-        printf("start sending............\n");
-        for (int i = 0; i < len; i++)
+        if (g_asw_debug_enable == 1)
         {
-            printf("%02x ", buffer[i]);
+            ESP_LOGI("-S-", "send arm update start....\n");
+            for (int i = 0; i < len; i++)
+            {
+                printf("<%02x> ", buffer[i]);
+            }
+            printf("\n");
         }
-        printf("\n");
 
         uart_write_bytes(UART_NUM_1, buffer, len);
         sleep(1);
@@ -945,7 +1016,17 @@ void trans_file_to_gd32_broadcast(char *inv_fw_path, char slave_id)
                 len++;
                 buffer[len] = (crc >> 8) & 0xff; // check sum low
                 len++;
-                printf("total frame len:%d", len);
+                ASW_LOGI("total frame len:%d", len);
+
+                if (g_asw_debug_enable == 1)
+                {
+                    ESP_LOGI("-S-", "send arm update data....\n");
+                    for (int i = 0; i < len; i++)
+                    {
+                        printf("<%02x> ", buffer[i]);
+                    }
+                    printf("\n");
+                }
 
                 uart_write_bytes(UART_NUM_1, buffer, len);
                 send_ratio = (send_len * 1000 / file_len);
@@ -983,6 +1064,16 @@ void trans_file_to_gd32_broadcast(char *inv_fw_path, char slave_id)
         buffer[15] = (crc >> 8) & 0xff; // check sum low
         len = 16;
 
+        if (g_asw_debug_enable == 1)
+        {
+            ESP_LOGI("-S-", "send arm update finish....\n");
+            for (int i = 0; i < len; i++)
+            {
+                printf("<%02x> ", buffer[i]);
+            }
+            printf("\n");
+        }
+
         uart_write_bytes(UART_NUM_1, buffer, len);
         sleep(2);
 
@@ -990,29 +1081,29 @@ void trans_file_to_gd32_broadcast(char *inv_fw_path, char slave_id)
         if (info.file_type == 3)
         {
 
-            printf("Upgrade inv end Wait 3min for INV to restart\r\n");
+            printf("Upgrade arm end Wait 3min for INV to restart\r\n");
             for (uint8_t i = 0; i < 180; i++)
             {
-                ESP_LOGI("update arm...", "%f %%", i * 100.0 / 180.0);
+                ESP_LOGI("update arm...", "%d %%", (uint16_t)(i * 100.0 / 180.0));
                 sleep(1);
             }
         }
         else if (info.file_type < 4)
         {
-            printf("Upgrade inv end Wait 11min for INV to restart\r\n");
+            printf("Upgrade inv end Wait 12min for INV to restart\r\n");
             for (uint8_t i = 0; i < 720; i++)
             {
-                ESP_LOGI("update inv...", "%f %%", i * 100.0 / 720.0);
+                ESP_LOGI("update inv...", "%d %%", (uint16_t)(i * 100.0 / 720.0));
                 sleep(1);
             }
         }
     }
     else
     {
-        printf("Open upgrade inv FW faile:%s\n", info.file_path);
+        ESP_LOGW("-- UpGrade ERROR --", "Open upgrade inv FW faile:%s\n", info.file_path);
     }
     remove(info.file_path);
-    printf("Upgrade inv FW ok %s exit\n", info.file_path);
+    ASW_LOGI("Upgrade inv FW ok %s exit\n", info.file_path);
 }
 //////////////////////////////////////////////////
 void inv_update(uint8_t modbus_id, char *inv_fw_path)
@@ -1226,28 +1317,30 @@ void trans_file_to_gd32(char *inv_fw_path, uint8_t slave_id)
         buffer[len] = (crc >> 8) & 0xFF;
         len++;
 
-        printf("start sending............\n");
-
-#if DEBUG_PRINT_ENABLE
-        for (int i = 0; i < len; i++)
+        /////////////////////////////////////////
+        if (g_asw_debug_enable == 1)
         {
-            printf("%02x ", buffer[i]);
-        }
-        printf("\n");
+            ESP_LOGI("-S-", "start sending............");
 
-#endif
+            for (int i = 0; i < len; i++)
+            {
+                printf("%02x ", buffer[i]);
+            }
+            printf("\n");
+        }
+        /////////////////////////////////////////////////
         for (uint8_t j = 0; j < 10; j++)
         {
             res = comm_write_data_combox(CMD_WRITE_START_FRAME, buffer, len);
             sleep(1);
 
-            printf("send start frame for the ----------------- %dth time\n", j);
+            ASW_LOGI("send start frame for the ----------------- %dth time\n", j);
             if (res == 0)
                 break;
         }
         if (res != 0)
         {
-            printf("send start frame 10 times fail\n");
+            ESP_LOGW(TAG, "send start frame 10 times fail\n");
             return;
         }
 
@@ -1416,7 +1509,7 @@ void update_info_parse(Updata_Info_St *update_info)
 
         update_info->file_type = 4;
     }
-    else if (strstr(update_info->file_name, "arm") != NULL)
+    else if (strstr(update_info->file_name, "comm") != NULL)
     {
         update_info->file_type = 3;
     }
@@ -1461,32 +1554,42 @@ rst_code zs_write_end_frame_combox(uint8_t *data_ptr, unsigned short w_len)
     unsigned int i = 0;
 
     uart_write_bytes(UART_NUM_1, data_ptr, len);
-#if DEBUG_PRITN_ENABLE
-    printf("end frame:\n");
-    for (i = 0; i < len; i++)
+    if (g_asw_debug_enable == 1)
     {
-        printf("<%02X>", data_ptr[i]);
+        ESP_LOGI("-S-", "send broadcast update finish....");
+        for (i = 0; i < len; i++)
+        {
+            printf("<%02X>", data_ptr[i]);
+        }
+        printf("\n");
     }
 
-#endif
-    printf("\n");
+    uint8_t res_buf[256] = {0};
+    uint16_t res_len = 0;
+    int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+    //////////////////////////////////////
+    if (g_asw_debug_enable == 1)
     {
-        uint8_t res_buf[256] = {0};
-        uint16_t res_len = 0;
-        int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
-        if (res_len == 12 && crc16_calc(res_buf, res_len) == 0)
+        ESP_LOGI("-R-", "receive scan...");
+        for (uint8_t i = 0; i < res_len; i++)
         {
-            if (memcmp(res_buf, data_ptr, 8) == 0)
+            printf("*%02X ", res_buf[i]);
+        }
+        printf("\n");
+    }
+    ////////////////////////////////////
+    if (res_len == 12 && crc16_calc(res_buf, res_len) == 0)
+    {
+        if (memcmp(res_buf, data_ptr, 8) == 0)
+        {
+            if (res_buf[8] == 0x00 && res_buf[9] == 0x03)
             {
-                if (res_buf[8] == 0x00 && res_buf[9] == 0x03)
-                {
-                    printf("end ack ok\n");
-                    return 0;
-                }
+                printf("end ack ok\n");
+                return 0;
             }
         }
-        return -1;
     }
+    return -1;
 }
 
 rst_code zs_write_data_frame_combox(uint8_t *data_ptr, unsigned short w_len)
@@ -1495,31 +1598,47 @@ rst_code zs_write_data_frame_combox(uint8_t *data_ptr, unsigned short w_len)
     unsigned short len = w_len;
     unsigned int i = 0;
 
-    uart_write_bytes(UART_NUM_1, data_ptr, len);
-    printf("data frame:\n");
-    // for (i = 0; i < len; i++)
-    // {
-    //     printf("<%02X>", data_ptr[i]);
-    // }
-    // printf("\n");
-
+    //////////////////////////////////
+    if (g_asw_debug_enable == 1)
     {
-        uint8_t res_buf[256] = {0};
-        uint16_t res_len = 0;
-        int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
-        if (res_len == 12 && crc16_calc(res_buf, res_len) == 0)
+        ESP_LOGI("-S-", "send broadcast update data....");
+        for (i = 0; i < len; i++)
         {
-            if (memcmp(res_buf, data_ptr, 8) == 0)
+            printf("<%02X>", data_ptr[i]);
+        }
+        printf("\n");
+    }
+
+    ////////////////////////////////////
+
+    uart_write_bytes(UART_NUM_1, data_ptr, len);
+
+    uint8_t res_buf[256] = {0};
+    uint16_t res_len = 0;
+    int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+    //////////////////////////////////////
+    if (g_asw_debug_enable == 1)
+    {
+        ESP_LOGI("-R-", "receive scan...");
+        for (uint8_t i = 0; i < res_len; i++)
+        {
+            printf("*%02X ", res_buf[i]);
+        }
+        printf("\n");
+    }
+    ////////////////////////////////////
+    if (res_len == 12 && crc16_calc(res_buf, res_len) == 0)
+    {
+        if (memcmp(res_buf, data_ptr, 8) == 0)
+        {
+            if (res_buf[8] == 0x00 && res_buf[9] == 0x02)
             {
-                if (res_buf[8] == 0x00 && res_buf[9] == 0x02)
-                {
-                    printf("data ack ok\n");
-                    return 0;
-                }
+                printf("data ack ok\n");
+                return 0;
             }
         }
-        return -1;
     }
+    return -1;
 }
 
 rst_code zs_write_start_frame_combox(uint8_t *data_ptr, unsigned short w_len)
@@ -1529,28 +1648,44 @@ rst_code zs_write_start_frame_combox(uint8_t *data_ptr, unsigned short w_len)
     unsigned int i = 0;
 
     uart_write_bytes(UART_NUM_1, data_ptr, len);
-    printf("start frame:\n");
-    for (i = 0; i < len; i++)
+
+    //////////////////////////////////
+    if (g_asw_debug_enable == 1)
     {
-        printf("<%02X>", data_ptr[i]);
-    }
-    printf("\n");
-    {
-        uint8_t res_buf[256] = {0};
-        uint16_t res_len = 0;
-        int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
-        if (res_len == 12 && crc16_calc(res_buf, res_len) == 0)
+        ESP_LOGI("-S-", "send broadcast update start....");
+        for (i = 0; i < len; i++)
         {
-            if (memcmp(res_buf, data_ptr, 8) == 0)
+            printf("<%02X>", data_ptr[i]);
+        }
+        printf("\n");
+    }
+
+    ////////////////////////////////////
+    uint8_t res_buf[256] = {0};
+    uint16_t res_len = 0;
+    int res = recv_bytes_frame_waitting_nomd(UART_NUM_1, res_buf, &res_len);
+    //////////////////////////////////////
+    if (g_asw_debug_enable == 1)
+    {
+        ESP_LOGI("-R-", "receive scan...");
+        for (uint8_t i = 0; i < res_len; i++)
+        {
+            printf("*%02X ", res_buf[i]);
+        }
+        printf("\n");
+    }
+    ////////////////////////////////////
+    if (res_len == 12 && crc16_calc(res_buf, res_len) == 0)
+    {
+        if (memcmp(res_buf, data_ptr, 8) == 0)
+        {
+            if (res_buf[8] == 0x00 && res_buf[9] == 0x01)
             {
-                if (res_buf[8] == 0x00 && res_buf[9] == 0x01)
-                {
-                    printf("start ack ok\n");
-                    return 0;
-                }
+                ASW_LOGI("start ack ok\n");
+                return 0;
             }
         }
-        return -1;
     }
+    return -1;
 }
 #endif

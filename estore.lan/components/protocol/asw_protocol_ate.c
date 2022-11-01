@@ -64,6 +64,10 @@ char *protocol_ate_ifconfig_handler(void)
 
     /* V2.0.0 change */
     // get_eth_ip(buf);
+    if (g_stick_run_mode == Work_Mode_LAN)
+        get_eth_ip(buf);
+    else if (g_stick_run_mode == Work_Mode_STA)
+        get_sta_ip(buf);
 
     cJSON_AddStringToObject(res, "ip", buf);
     // cJSON_AddNumberToObject(res, "typ", 1);
@@ -116,6 +120,9 @@ int8_t protocol_ate_staset_handler(char *body)
     getJsonStr((char *)sta_para.password, "password", sizeof(sta_para.password), json);
 
     general_add(NVS_STA_PARA, &sta_para);
+
+    int work_mode_ate = Work_Mode_STA;
+    general_add(NVS_WORK_MODE, &work_mode_ate);
 
     cJSON_Delete(json);
     return 0;
@@ -313,10 +320,37 @@ char *protocol_ate_lan_get_handler(void)
         sprintf(mMsk, "%hd.%hd.%hd.%hd", st_net_lanInfo.mask[0], st_net_lanInfo.mask[1], st_net_lanInfo.mask[2], st_net_lanInfo.mask[3]);
         sprintf(mGtw, "%hd.%hd.%hd.%hd", st_net_lanInfo.gateway[0], st_net_lanInfo.gateway[1], st_net_lanInfo.gateway[2], st_net_lanInfo.gateway[3]);
         sprintf(mDns, "%hd.%hd.%hd.%hd", st_net_lanInfo.maindns[0], st_net_lanInfo.maindns[1], st_net_lanInfo.maindns[2], st_net_lanInfo.maindns[3]);
+
+        if (st_net_lanInfo.work_mode == Work_Mode_STA)
+        {
+            get_sta_mac(mMac);
+        }
+        else if (st_net_lanInfo.work_mode == Work_Mode_LAN)
+        {
+            get_eth_mac(mMac);
+        }
     }
     else
     {
         cJSON_AddStringToObject(res, "oia", "0");
+
+        if (g_stick_run_mode == Work_Mode_STA)
+        {
+            memcpy(mIp, my_sta_ip, sizeof(my_sta_ip));
+            memcpy(mMsk, my_sta_mk, sizeof(my_sta_mk));
+            memcpy(mGtw, my_sta_gw, sizeof(my_sta_gw));
+            get_sta_mac(mMac);
+            memcpy(mDns, my_sta_dns, sizeof(mDns));
+        }
+        else if (g_stick_run_mode == Work_Mode_LAN)
+        {
+
+            memcpy(mIp, my_eth_ip, sizeof(my_eth_ip));
+            memcpy(mMsk, my_eth_mk, sizeof(my_eth_mk));
+            memcpy(mGtw, my_eth_gw, sizeof(my_eth_gw));
+            get_eth_mac(mMac);
+            memcpy(mDns, my_eth_dns, sizeof(mDns));
+        }
     }
 
     cJSON_AddStringToObject(res, "ip", mIp);

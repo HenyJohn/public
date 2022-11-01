@@ -21,9 +21,6 @@
 #define MAX_BATTERY_PLAN 6
 #define METER_RECON_TIMES 30
 
-#define MAIN_UART 0
-#define CAT1_UART 2
-
 typedef char ate_reboot_t[20]; //[tgl mark] 50->20
 typedef char blufi_name_t[50];
 
@@ -31,6 +28,7 @@ extern int g_drm_value;
 
 /** 事件标志位组*/
 extern uint32_t task_cld_msg;
+
 // extern uint32_t task_inv_msg;  LanStick-MultilInv
 extern uint32_t task_inv_msg_arr[INV_NUM];
 extern uint32_t task_inv_meter_msg;
@@ -39,7 +37,6 @@ extern uint16_t g_task_inv_broadcast_msg;
 extern uint32_t task_other_msg;
 extern uint32_t event_group_0;
 //--------------------------//
-extern char is_in_cloud_main_loop;
 
 typedef enum
 {
@@ -59,33 +56,6 @@ typedef enum
     MSG_UPDATE_INV_SAFETY,
     MSG_SCAN_INVERTER
 } ALL_MSG_TYPE;
-
-/** dan.wang */
-typedef struct
-{
-    char apn[128];
-    char username[128];
-    char password[128];
-} apn_para_t;
-
-typedef struct
-{
-    int active;
-    char topic[100];
-    char payload[1500];
-} cld_rrpc_resp_t;
-
-typedef struct
-{
-    char host[128];
-    int port;
-    char client_id[150];
-    char username[64];
-    char password[65];
-    char pub_topic[100];
-    char sub_topic[100];
-    int ssl_enable;
-} _3rd_mqtt_para_t;
 
 //=============modbus===========//
 typedef struct
@@ -244,8 +214,8 @@ typedef struct
 typedef struct
 {
     uint8_t ssid[32];
-    uint8_t password[64];
-    // uint8_t password[32];
+    // uint8_t password[64];
+    uint8_t password[32];
 
 } wifi_sta_para_t;
 
@@ -594,7 +564,7 @@ typedef struct
 #define MSG_WRT_STA_INFO_INDEX 0x0010        ///< uesed to inform inv_com task update the sechdule immediately
 #define MSG_WRT_SET_HOST_INDEX 0x0020        ///< uesed to inform inv_com task to set addr to host
 #define MSG_BRDCST_DSP_ZV_CLD_INDEX 0x0040   ///< uesed to inform inv_com task to send cloud status to inv
-
+#define MSG_BRDCST_CHARGE_INDEX 0x0080   ///< uesed to inform inv_com task to send charge/discharge battery
 //----- inv register add ----------
 #define INV_REG_ADDR_SSID_PSSWD 0X0484   // register address 41157 ssid
 #define INV_REG_ADDR_SET_HOST 0X045C     // register address 41117 主从机设置
@@ -706,8 +676,6 @@ void set_current_date(DATE_STRUCT *date);
 void get_current_date(DATE_STRUCT *date);
 
 extern int netework_state;
-extern cld_rrpc_resp_t cld_resp_var;
-extern int rrpc_resp_concel;
 
 ////////////// Lanstick-MultilInv /////////////
 
