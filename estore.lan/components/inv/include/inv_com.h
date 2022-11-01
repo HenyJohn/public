@@ -110,4 +110,6 @@ int get_cld_inv_arr_first(void);
 
 int asw_inv_data_init();
 
+int asw_is_safety_96_97(void);
+
 #endif

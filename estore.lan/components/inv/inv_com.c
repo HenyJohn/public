@@ -185,13 +185,13 @@ uint8_t load_reg_info(void)
 
         // if (ret1 != ASW_FAIL)
         // {
-        printf("\n---------  reg_info_arr[%d].sn:%s,  m_bat_monitor_para[%d].sn:%s  -----------  [%d]\n", i, reg_info_arr[i].sn, i,
-               m_bat_monitor_para[i].sn, m_bat_monitor_para[i].modbus_id);
+        ASW_LOGI("\n---------  reg_info_arr[%d].sn:%s,  m_bat_monitor_para[%d].sn:%s  -----------  [%d]\n", i, reg_info_arr[i].sn, i,
+                 m_bat_monitor_para[i].sn, m_bat_monitor_para[i].modbus_id);
         if (strcmp(reg_info_arr[i].sn, m_bat_monitor_para[i].sn) == 0)
         {
             flag_monitor_get = 1;
-            printf("\n=========   dc_per:%d,uu1:%d ,num:%d,mod_b:%d,sta_b:%d===", m_bat_monitor_para[i].batmonitor.dc_per, m_bat_monitor_para[i].batmonitor.uu1,
-                   m_bat_monitor_para[i].batmonitor.up2, m_bat_monitor_para[i].batmonitor.uu2, m_bat_monitor_para[i].batmonitor.uu4);
+            ASW_LOGI("\n=========   dc_per:%d,uu1:%d ,num:%d,mod_b:%d,sta_b:%d===", m_bat_monitor_para[i].batmonitor.dc_per, m_bat_monitor_para[i].batmonitor.uu1,
+                     m_bat_monitor_para[i].batmonitor.up2, m_bat_monitor_para[i].batmonitor.uu2, m_bat_monitor_para[i].batmonitor.uu4);
         }
         // }
         // }
@@ -228,8 +228,9 @@ uint8_t load_reg_info(void)
             m_bat_monitor_para[i].batmonitor.chg_max = 10;   //!<  q value;
         }
 
-        ESP_LOGI(TAG, "load modbus id: %02x, sn: %s\n",
-                 inv_arr[i].regInfo.modbus_id, inv_arr[i].regInfo.sn);
+        ASW_LOGI("load inv_arr modbus id: %02x, sn: %s ;  m_bat_monitor[%d].modbus_id[%d],sn[%s]\n",
+                 inv_arr[i].regInfo.modbus_id, inv_arr[i].regInfo.sn,
+                 i, m_bat_monitor_para[i].modbus_id, m_bat_monitor_para[i].sn);
     }
 
     //////////////////////////////////////////////////////////////
@@ -237,8 +238,12 @@ uint8_t load_reg_info(void)
     // printf("\n---------------   TEST LOAD INV INFO PERIOD ----------------\n");
     // printf(" period:%lld", get_msecond_sys_time() - mPeriod);
     // printf("\n---------------   TEST LOAD INV INFO PERIOD ----------------\n");
+    if (i > 1)
+    {
+        write_global_var_to_nvs(PARA_CONFIG, &m_bat_monitor_para);
 
-    write_global_var_to_nvs(PARA_CONFIG, &m_bat_monitor_para);
+        ASW_LOGI("--- Load inv info ro battery monitor ---\n");
+    }
 
     // write_global_var_to_nvs(PARA_SCHED_BAT, &tmp_bat_schedule_bat);
 
@@ -266,7 +271,7 @@ int8_t get_modbus_id(uint8_t *id)
     if (inv_arr[i - 1].regInfo.modbus_id < 246)
     {
         *id = inv_arr[i - 1].regInfo.modbus_id + 1;
-        ESP_LOGI(TAG, "next id %d \n", *id);
+        ASW_LOGI("next id %d \n", *id);
         return ASW_OK;
     }
     else
@@ -282,7 +287,7 @@ int8_t get_sum(uint8_t *buf, int len, uint8_t *high_byte, uint8_t *low_byte)
         sum += buf[i];
     *high_byte = (sum >> 8) & 0xFF;
     *low_byte = sum & 0xFF;
-    ESP_LOGI(TAG, "high low: %02X %02X\n", *high_byte, *low_byte);
+    ASW_LOGI("high low: %02X %02X\n", *high_byte, *low_byte);
     return ASW_OK;
 }
 //--------------------------------------------------//
@@ -344,7 +349,7 @@ int chk_msg(cloud_inv_msg *trans_data)
 
         memcpy(ws, &trans_data->data[trans_data->len], strlen(trans_data->data)); //[tgl mark] ???
 
-        ESP_LOGI(TAG, "recvmsg %d %d  %d  %d %s\n", sizeof(buf), trans_data->len,
+        ASW_LOGI("recvmsg %d %d  %d  %d %s\n", sizeof(buf), trans_data->len,
                  strlen(trans_data->data), trans_data->len, ws);
         return 2;
     }
@@ -355,8 +360,8 @@ int chk_msg(cloud_inv_msg *trans_data)
         trans_data->len = buf.len;
         trans_data->ws = buf.len;
 
-        ESP_LOGI(TAG, "recv msg---%s--%d--\n", buf.data, buf.len);
-        ESP_LOGI(TAG, "mstyp %d --%s-- %c-- %d --%s--\n", buf.type,
+        ASW_LOGI("recv msg---%s--%d--\n", buf.data, buf.len);
+        ASW_LOGI("mstyp %d --%s-- %c-- %d --%s--\n", buf.type,
                  buf.data, buf.ws, trans_data->len, trans_data->data);
 
         return 3;
@@ -364,12 +369,12 @@ int chk_msg(cloud_inv_msg *trans_data)
     else if (5 == buf.type)
     {
         trans_data->ws = buf.data[0];
-        ESP_LOGI(TAG, "mstyp %d %d %d %d %d\n", buf.type, buf.data[0], buf.data[1], buf.data[2], buf.ws);
+        ASW_LOGI("mstyp %d %d %d %d %d\n", buf.type, buf.data[0], buf.data[1], buf.data[2], buf.ws);
         return 5;
     }
     else if (6 == buf.type)
     {
-        ESP_LOGI(TAG, "mstyp clear meter %d %s \n", buf.type, buf.data);
+        ASW_LOGI("mstyp clear meter %d %s \n", buf.type, buf.data);
 
         return 6;
     }
@@ -378,7 +383,7 @@ int chk_msg(cloud_inv_msg *trans_data)
 
         memcpy(trans_data->data, buf.data, sizeof(buf.data));
         trans_data->len = buf.len;
-        ESP_LOGI(TAG, "reboot monitor or inverter %d %d %s \n", buf.type, buf.data[0], &buf.data[1]);
+        ASW_LOGI("reboot monitor or inverter %d %d %s \n", buf.type, buf.data[0], &buf.data[1]);
         return 99;
     }
     else if (30 == buf.type)
@@ -386,8 +391,8 @@ int chk_msg(cloud_inv_msg *trans_data)
         memcpy(trans_data->data, buf.data, sizeof(buf.data));
         trans_data->len = buf.len;
         trans_data->ws = buf.len;
-        ESP_LOGI(TAG, "recv cgi msg update---%s--%d--\n", buf.data, buf.len);
-        ESP_LOGI(TAG, "mstyp %d --%s-- %c-- %d --%s--\n", buf.type, buf.data,
+        ASW_LOGI("recv cgi msg update---%s--%d--\n", buf.data, buf.len);
+        ASW_LOGI("mstyp %d --%s-- %c-- %d --%s--\n", buf.type, buf.data,
                  buf.ws, trans_data->len, trans_data->data);
 
         return 30;
@@ -398,8 +403,8 @@ int chk_msg(cloud_inv_msg *trans_data)
         memcpy(trans_data->data, buf.data, sizeof(buf.data));
         trans_data->len = buf.len;
         trans_data->ws = buf.len;
-        ESP_LOGI(TAG, "recv cgi msg scan---%s--%d--\n", buf.data, buf.len); //[tgl mark] data读取不到值
-        ESP_LOGI(TAG, "mstyp %d --%s-- %c-- %d --%s--\n", buf.type, buf.data,
+        ASW_LOGI("recv cgi msg scan---%s--%d--\n", buf.data, buf.len); //[tgl mark] data读取不到值
+        ASW_LOGI("mstyp %d --%s-- %c-- %d --%s--\n", buf.type, buf.data,
                  buf.ws, trans_data->len, trans_data->data);
 
         return 50;
@@ -410,14 +415,14 @@ int chk_msg(cloud_inv_msg *trans_data)
         trans_data->len = buf.len;
         memcpy(ws, &trans_data->data[trans_data->len], strlen(trans_data->data)); //-trans_data->len);
 
-        ESP_LOGI(TAG, "cgi trans recvmsg %d %d  %d  %d %s\n", sizeof(buf),
+        ASW_LOGI("cgi trans recvmsg %d %d  %d  %d %s\n", sizeof(buf),
                  trans_data->len, strlen(trans_data->data), trans_data->len, ws);
 
         return 20;
     }
     else if (60 == buf.type)
     {
-        ESP_LOGI(TAG, "mstyp clear meter %d %s \n", buf.type, buf.data);
+        ASW_LOGI("mstyp clear meter %d %s \n", buf.type, buf.data);
 
         return 60;
     }
@@ -428,12 +433,12 @@ int chk_msg(cloud_inv_msg *trans_data)
 void reg_info_log(void)
 {
     uint8_t i;
-    ESP_LOGI(TAG, "scan result:\n");
+    ASW_LOGI("scan result:\n");
     for (i = 0; i < INV_NUM; i++)
     {
         if (inv_arr[i].regInfo.modbus_id != 0)
         {
-            ESP_LOGI(TAG, "modbus id: %02x, sn: %s\n",
+            ASW_LOGI("modbus id: %02x, sn: %s\n",
                      inv_arr[i].regInfo.modbus_id, inv_arr[i].regInfo.sn);
         }
     }
@@ -450,7 +455,7 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
     int i = 0;
     uint16_t max_len = *res_len;
     uint16_t crc = 0;
-    ESP_LOGI(TAG, "maxlen---------------------------------%d------\n", max_len);
+    ASW_LOGI("maxlen---------------------------------%d------\n", max_len);
     while (1)
     {
         usleep(50000);
@@ -465,10 +470,13 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
         if (nread > 0)
         {
             len += nread;
-#if DEBUG_PRINT_ENABLE
-            for (i = 0; i < len; i++)
-                printf("*%02X", buf[i]);
-#endif
+            // #if DEBUG_PRINT_ENABLE
+            if (g_asw_debug_enable > 1)
+            {
+                for (i = 0; i < len; i++)
+                    printf("*%02X* ", buf[i]);
+            }
+            // #endif
             break;
         }
     }
@@ -476,7 +484,7 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
     if (len > 2)
     {
         crc = crc16_calc((uint8_t *)buf, len);
-        ESP_LOGI(TAG, "mmm crc %d \n", crc);
+        ASW_LOGI("mmm crc %d \n", crc);
         if (crc == 0)
         {
             memcpy(res_buf, buf, len);
@@ -488,7 +496,7 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
     if (len == max_len)
     {
         crc = crc16_calc(res_buf, *res_len);
-        ESP_LOGI(TAG, "MMM crc %d \n", crc);
+        ASW_LOGI("MMM crc %d \n", crc);
         if (crc == 0)
         {
             memcpy(res_buf, buf, len);
@@ -499,7 +507,7 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
 
     if (len > max_len + 5)
     {
-        ESP_LOGI(TAG, "maxlen-----------%d---%d---\n", max_len, len);
+        ASW_LOGI("maxlen-----------%d---%d---\n", max_len, len);
         return -1;
     }
 
@@ -510,17 +518,19 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
         if (nread > 0)
         {
             len += nread;
-#if DEBUG_PRINT_ENABLE
-
-            for (; i < len; i++)
-                printf("*%02X", buf[i]);
-#endif
+            // #if DEBUG_PRINT_ENABLE
+            if (g_asw_debug_enable > 1)
+            {
+                for (; i < len; i++)
+                    printf("*%02X* ", buf[i]);
+            }
+            // #endif
         }
         else
         {
             if (len > max_len + 5)
             {
-                ESP_LOGI(TAG, "maxlen-----------%d---%d---\n", max_len, len);
+                ASW_LOGI("maxlen-----------%d---%d---\n", max_len, len);
                 return -1;
             }
             // end_read:
@@ -533,7 +543,7 @@ int recv_bytes_frame_meter(int fd, uint8_t *res_buf, uint16_t *res_len)
     crc = crc16_calc(res_buf, *res_len);
 
 end_read:
-    ESP_LOGI(TAG, "recvv ok %x  %x %d \n", crc, ((res_buf[*res_len - 2] << 8) | res_buf[*res_len - 1]), len);
+    ASW_LOGI("recvv ok %x  %x %d \n", crc, ((res_buf[*res_len - 2] << 8) | res_buf[*res_len - 1]), len);
     if (len > 1 && 0 == crc) //((res_buf[*res_len-2]<<8)|res_buf[*res_len-1]) == crc)
         return 0;
     else
@@ -561,11 +571,14 @@ int8_t recv_bytes_frame_waitting_nomd(int fd, uint8_t *res_buf, uint16_t *res_le
         if (nread > 0)
         {
             len += nread;
-#if DEBUG_PRINT_ENABLE
+            // #if DEBUG_PRINT_ENABLE
+            if (g_asw_debug_enable > 1)
+            {
+                for (; i < len; i++)
+                    printf("*%02X", buf[i]); //
+            }
 
-            for (; i < len; i++)
-                printf("*%02X", buf[i]); // tgl mark
-#endif
+            // #endif
             break;
         }
     }
@@ -574,24 +587,28 @@ int8_t recv_bytes_frame_waitting_nomd(int fd, uint8_t *res_buf, uint16_t *res_le
     {
         usleep(50000);
         nread = uart_read_bytes(fd, buf + len, sizeof(buf) - len, 0);
-        printf("recvvv ****************************%d \n", nread);
+        ASW_LOGI("recvvv ****************************%d \n", nread);
         if (nread > 0)
         {
             len += nread;
-#if DEBUG_PRINT_ENABLE
-            for (; i < len; i++)
-                printf("*%02X", buf[i]);
-#endif
+            // #if DEBUG_PRINT_ENABLE
+            if (g_asw_debug_enable > 1)
+            {
+                for (; i < len; i++)
+                    printf("*%02X", buf[i]);
+            }
+
+            // #endif
         }
         else
         {
-            ESP_LOGI(TAG, "recvvv ***** \n");
+            ASW_LOGI("recvvv ***** \n");
             memcpy(res_buf, buf, len);
             *res_len = len;
             return ASW_OK;
         }
     }
-    ESP_LOGI(TAG, "recvvv -1 \n");
+    ASW_LOGI("recvvv -1 \n");
     *res_len = 0;
     return ASW_FAIL;
 }
@@ -618,7 +635,6 @@ SERIAL_STATE inv_task_schedule(char *func, cloud_inv_msg *data)
     period = (get_second_sys_time() - request_data_time);
 
     res = chk_msg(data);
-    // printf("\n------------------- AAAAAAAAAAAAAAAAAAAA-------[res:%d]---------\n", res);
 
     if (2 == res)
     {
@@ -677,12 +693,11 @@ SERIAL_STATE inv_task_schedule(char *func, cloud_inv_msg *data)
      * 每10s,  调用TASK_QUERY_DATA
      * 每390ms,调用TASK_QUERY_METER  //没有来自云端的数据信息会到这里
      */
-    //////////////////// tgl mark test /////////////
 
     if (period >= cycle) // period >= QUERY_TIMING * 1000000 || period < 0)
     {
         request_data_time = get_second_sys_time(); // esp_timer_get_time();
-        ESP_LOGI(TAG, "read inv data time sec: %lld\n", request_data_time);
+        ASW_LOGI("read inv data time sec: %lld\n", request_data_time);
         return TASK_QUERY_DATA;
     }
 
@@ -709,6 +724,7 @@ SERIAL_STATE inv_task_schedule(char *func, cloud_inv_msg *data)
             event_group_0 |= SEND_INV_DATA_ONCE;
             request_data_time = get_second_sys_time();
             new_sync_fsm = 0;
+            printf("\n------   debug TASK_QUERY_DATA------\n");
             return TASK_QUERY_DATA;
         }
         break;
@@ -720,20 +736,15 @@ SERIAL_STATE inv_task_schedule(char *func, cloud_inv_msg *data)
     {
         event_group_0 &= ~PWR_REG_SOON_MASK;
         read_meter_time = get_msecond_sys_time();
-        //在cgi或cloud接收到设置电表的命令后，不再由query_meter处理，而是直接由energy_meter_control_combox()函数处理
 #if TRIPHASE_ARM_SUPPORT
-
+        //在cgi或cloud接收到设置电表的命令后，不再由query_meter处理，而是直接由energy_meter_control_combox()函数处理
         return TASK_ENERGE_METER_CONTROL;
-
 #else
-
         return TASK_QUERY_METER;
-
 #endif
     }
     else
     {
-
         if (get_msecond_sys_time() - read_meter_time > 390) // 390 ms
         {
             read_meter_time = get_msecond_sys_time();
@@ -843,8 +854,7 @@ int internal_inv_log(int typ)
         memcpy(inv_log.log, buf, strlen(buf));
     }
 
-    ESP_LOGI(TAG, "inv_log_enable-- %s \n", inv_log.tag);
-    ESP_LOGI(TAG, "inv_log_enable   %s \n", inv_log.log);
+    ASW_LOGI("inv_log_enable-- %s \n", inv_log.tag);
     return 0;
 }
 //--------------------------------------------------------------//
@@ -905,14 +915,12 @@ SERIAL_STATE query_data_proc()
 
     if (!g_num_real_inv)
     {
-        printf("\n-----------  g_num_inv is 0 --------------------\n");
+        ASW_LOGI("-----------  g_num_inv is 0 --------------------\n");
         g_num_real_inv = load_reg_info();
         if (g_num_real_inv > 0)
             internal_inv_log(g_num_real_inv);
     }
-    // printf("\n------------query_data_proc-----------\n");
-    // printf("%d", g_num_real_inv);
-    // printf("\n------------query_data_proc-----------\n");
+
     if (g_num_real_inv < 1)
     {
         ESP_LOGI(TAG, " only one inverter default add 3 \n");
@@ -953,10 +961,10 @@ SERIAL_STATE query_data_proc()
      *          从逆变器读取时间 *  stick与逆变器时间同步（上电会执行）
      * @param
      ****************************************************************/
-    ESP_LOGI(TAG, "read time A %d %d \n", g_monitor_state, curr_inv_ptr->status);
+    ASW_LOGI("read time A %d %d \n", g_monitor_state, curr_inv_ptr->status);
     if (!g_monitor_state)
     {
-        ESP_LOGI(TAG, "read time B  %d %d \n", g_monitor_state, curr_inv_ptr->status);
+        ASW_LOGI("read time B  %d %d \n", g_monitor_state, curr_inv_ptr->status);
         if (curr_inv_ptr->status)
         {
 
@@ -967,7 +975,7 @@ SERIAL_STATE query_data_proc()
         }
     }
     /* read data from inverter*/ //&& g_monitor_state == SYNC_TIME_END
-    ESP_LOGI(TAG, "read inv data start... %d  %d %s\n",
+    ASW_LOGI("read inv data start... %d  %d %s\n",
              curr_inv_ptr->regInfo.modbus_id,
              inv_arr[inv_index - 1].last_save_time,
              inv_arr[inv_index - 1].regInfo.sn);
@@ -996,7 +1004,7 @@ SERIAL_STATE query_data_proc()
 
         save_time = inv_arr[inv_index - 1].regInfo.syn_time;
 
-        ESP_LOGI(TAG, "mode_name %s \n", inv_arr[inv_index - 1].regInfo.mode_name);
+        ASW_LOGI("mode_name %s \n", inv_arr[inv_index - 1].regInfo.mode_name);
 
         /****************************************************************
          * @brief 信息错误时，重新读取info *
@@ -1039,7 +1047,7 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
     int i = 0;
     uint16_t max_len = *res_len;
     uint16_t crc = 0;
-    ESP_LOGI(TAG, "maxlen--%d---\n", max_len);
+    ASW_LOGI("maxlen--%d---\n", max_len);
 
     while (1)
     {
@@ -1055,11 +1063,13 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
         if (nread > 0)
         {
             len += nread;
-#if DEBUG_PRINT_ENABLE
-            for (i = 0; i < len; i++)
-                printf("*%02X", buf[i]);
-
-#endif
+            // #if DEBUG_PRINT_ENABLE
+            if (g_asw_debug_enable > 1)
+            {
+                for (i = 0; i < len; i++)
+                    printf("*%02X* ", buf[i]);
+            }
+            // #endif
             break;
         }
     }
@@ -1067,7 +1077,7 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
     if (len > 2)
     {
         crc = crc16_calc(buf, len);
-        ESP_LOGI(TAG, "ffff crc %d \n", crc);
+        ASW_LOGI("ffff crc %d \n", crc);
         if (crc == 0)
         {
             memcpy(res_buf, buf, len);
@@ -1079,7 +1089,7 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
     if (len == max_len)
     {
         crc = crc16_calc(res_buf, *res_len);
-        ESP_LOGI(TAG, "XXX crc %d \n", crc);
+        ASW_LOGI("XXX crc %d \n", crc);
         if (crc == 0)
         {
             memcpy(res_buf, buf, len);
@@ -1090,7 +1100,7 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
 
     if (len > max_len + 5)
     {
-        ESP_LOGI(TAG, "maxlen------%d---%d---\n", max_len, len);
+        ASW_LOGI("maxlen------%d---%d---\n", max_len, len);
         return ASW_FAIL;
     }
 
@@ -1112,7 +1122,7 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
 
     if (len > max_len + 5)
     {
-        ESP_LOGI(TAG, "maxlen-----%d---%d---\n", max_len, len);
+        ASW_LOGI("maxlen-----%d---%d---\n", max_len, len);
         return ASW_FAIL;
     }
 
@@ -1123,16 +1133,20 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
         if (nread > 0)
         {
             len += nread;
-#if DEBUG_PRINT_ENABLE
-            for (; i < len; i++)
-                printf("*%02X", buf[i]);
-#endif
+            // #if DEBUG_PRINT_ENABLE
+            if (g_asw_debug_enable > 1)
+            {
+
+                for (; i < len; i++)
+                    printf("*%02X* ", buf[i]);
+            }
+            // #endif
         }
         else
         {
             if (len > max_len + 5)
             {
-                ESP_LOGI(TAG, "maxlen----%d---%d---\n", max_len, len);
+                ASW_LOGI("maxlen----%d---%d---\n", max_len, len);
                 return ASW_FAIL;
             }
             // end_read:
@@ -1144,7 +1158,7 @@ int8_t recv_bytes_frame_transform(int fd, uint8_t *res_buf, uint16_t *res_len)
     crc = crc16_calc(res_buf, *res_len);
 
 end_read:
-    ESP_LOGI(TAG, "recvv ok %x  %x %d ",
+    ASW_LOGI("recvv ok %x  %x %d ",
              crc, ((res_buf[*res_len - 2] << 8) | res_buf[*res_len - 1]), len);
     if (len > 1 && 0 == crc)
         return ASW_OK;
@@ -1200,18 +1214,22 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
     int byteLen;
     fdbg_msg_t fdbg_msg;
 
-#if DEBUG_PRINT_ENABLE
-    printf("org---->\n");
-    for (i = 0; i < 32; i++)
-        printf(" %d:<%0x2X> ", i, tans_data.data[i]);
-    printf("\n");
-#endif
+    // #if DEBUG_PRINT_ENABLE
+    if (g_asw_debug_enable > 1)
+    {
+        printf("org---->\n");
+        for (i = 0; i < 32; i++)
+            printf(" %d:<%0x2X> ", i, tans_data.data[i]);
+        printf("\n");
+    }
+
+    // #endif
     if (strlen(tans_data.data) - tans_data.len > 64)
         memcpy(ws, &tans_data.data[tans_data.len], 64);
     else
         memcpy(ws, &tans_data.data[tans_data.len], strlen(tans_data.data) - tans_data.len);
 
-    ESP_LOGI(TAG, "rec uuu ws>  %d %d  %d  %d %s\n", func, tans_data.len, strlen(tans_data.data), tans_data.len, ws);
+    ASW_LOGI("rec uuu ws>  %d %d  %d  %d %s\n", func, tans_data.len, strlen(tans_data.data), tans_data.len, ws);
 
     uart_wait_tx_done(UART_NUM_1, 0);
     // uart_tx_flush(0); [tgl mark]  没有这个函数 替换为uart_flush(0)
@@ -1221,13 +1239,19 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
     if (2 == func || 20 == func)
     {
         byteLen = StrToHex(read_data, tans_data.data, (int)tans_data.len);
-        // read_data=strtol( tans_data.data, NULL, 16);[tgl mark] 可以测试下这个函数
+
         uart_write_bytes(UART_NUM_1, (const char *)read_data, byteLen);
-        ESP_LOGW(TAG, "transdata ");
-#if DEBUG_PRINT_ENABLE
-        for (i = 0; i < byteLen; i++)
-            printf("<%02X> ", read_data[i]);
-#endif
+        /////////////////////////////////////////
+        if (g_asw_debug_enable == 1)
+        {
+            ESP_LOGI("--S--", "send to inv fbd ...\n");
+            for (uint8_t i = 0; i < byteLen; i++)
+                printf("<%02X> ", read_data[i]);
+            printf("\n");
+        }
+
+        /////////////////////////////////////////////////
+        ASW_LOGI("transdata ");
     }
 
     if (3 == func || 30 == func)
@@ -1244,7 +1268,7 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
 
     if (99 == func)
     {
-        ESP_LOGW(TAG, "restart machine data ---%d--- \n ", tans_data.data[0]);
+        ASW_LOGI("restart machine data ---%d--- \n ", tans_data.data[0]);
         sleep(2);
         if (tans_data.data[0] == 0 || tans_data.data[0] == 1)
         {
@@ -1258,7 +1282,8 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
     memset(read_data, 0, sizeof(read_data));
     //------------------------
     int res = recv_bytes_frame_transform(UART_NUM_1, buff_data, &data_len);
-    ESP_LOGI(TAG, "recvied respons data OK OK%s  %d \n ", buff_data, data_len);
+    ASW_LOGI("recvied respons data OK OK%s  %d \n ", buff_data, data_len);
+
     memset(trans_data.data, 0, sizeof(trans_data.data));
     //------------------------
 
@@ -1266,8 +1291,8 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
     trans_data.len = data_len;
 
     if (2 == func)
-        trans_resrrpc_pub(&trans_data, ws, data_len); // [tgl mark] ws没用到
-    ESP_LOGW(TAG, "--- DEBUG MARK waiting clound component app_mqtt.c---");
+        trans_resrrpc_pub(&trans_data, ws, data_len); // 
+    ASW_LOGI("--- DEBUG MARK waiting clound component app_mqtt.c---");
 
     if (20 == func)
     {
@@ -1278,7 +1303,7 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
 
         if (to_cgi_fdbg_mq != NULL)
         {
-            ESP_LOGI(TAG, "cgidata %d \n ", data_len);
+            ASW_LOGI("cgidata %d \n ", data_len);
             for (i = 0; i < data_len; i++)
                 printf("%02X ", fdbg_msg.data[i]);
 
@@ -1286,7 +1311,7 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
             if (to_cgi_fdbg_mq != NULL)
             {
                 if (xQueueSend(to_cgi_fdbg_mq, (void *)&fdbg_msg, 10 / portTICK_RATE_MS) == pdPASS) //[tgl mark]注意free的调用
-                    ESP_LOGI(TAG, "transform to cgi \n");
+                    ASW_LOGI("transform to cgi \n");
             }
             else
             {
@@ -1295,11 +1320,19 @@ SERIAL_STATE upinv_transdata_proc(char func, cloud_inv_msg tans_data)
         }
     }
 
-    ESP_LOGI(TAG, "recivedata ");
-    for (i = 0; i < data_len; i++)
-        printf("%02X ", buff_data[i]);
+    ASW_LOGI("recivedata ");
 
-    ESP_LOGI(TAG, "transdata OK OK return 485 ");
+    if (g_asw_debug_enable == 1)
+    {
+        ESP_LOGI(" --R--", " receive from inv fbd ...\n");
+        for (uint8_t i = 0; i < data_len; i++)
+            printf("*%02X ", buff_data[i]);
+        printf("\n");
+    }
+
+    /////////////////////////////////////////
+
+    ASW_LOGI("transdata OK OK return 485 ");
 
     return TASK_QUERY_DATA;
 }
@@ -1321,13 +1354,13 @@ int8_t save_reg_info(void)
     {
         if (inv_arr[i].regInfo.modbus_id == 0)
             break;
-        ESP_LOGI(TAG, "save modbus id: %02x, sn: %s\n",
+        ASW_LOGI("save modbus id: %02x, sn: %s\n",
                  inv_arr[i].regInfo.modbus_id, inv_arr[i].regInfo.sn);
 
         memcpy(&info_arr[i], &inv_arr[i].regInfo, sizeof(InvRegister));
     }
     ////////////////////////////////////////
-    ESP_LOGI(TAG, "save info_arr modbus id: %02x, sn: %s\n",
+    ASW_LOGI("save info_arr modbus id: %02x, sn: %s\n",
              info_arr[i].modbus_id, info_arr[i].sn);
 
     // general_add(NVS_INVTER_DB, (void *)info_arr);
@@ -1361,9 +1394,14 @@ int recv_bytes_scanonly(int fd, uint8_t *res_buf, int *res_len)
         if (nread > 0)
         {
             len += nread;
-            for (; i < len; i++)
-                printf("*%02X", buf[i]);
-            printf("\r\n");
+
+            if (g_asw_debug_enable > 1)
+            {
+                for (; i < len; i++)
+                    printf("*%02X* ", buf[i]);
+                printf("\r\n");
+            }
+
             break;
         }
     }
@@ -1376,21 +1414,23 @@ int recv_bytes_scanonly(int fd, uint8_t *res_buf, int *res_len)
         if (nread > 0)
         {
             len += nread;
-            ;
-            for (; i < len; i++)
-                printf("*%02X", buf[i]);
-            printf("\r\n");
+            if (g_asw_debug_enable > 1)
+            {
+                for (; i < len; i++)
+                    printf("*%02X* ", buf[i]);
+                printf("\r\n");
+            }
         }
         else
         {
-            printf("recvvv ****************************888 \n");
+            ASW_LOGI("recvvv ****************************888 \n");
             memcpy(res_buf, buf, len);
             *res_len = len;
             // break;
             return 0;
         }
     }
-    printf("recvvv -1 \n");
+    ASW_LOGW("recvvv -1 \n");
     *res_len = 0;
     return -1;
 }
@@ -1424,7 +1464,7 @@ SERIAL_STATE scan_register(void)
     ASW_LOGW("********  debug printf: scan_start_time_sec %lld", scan_start_time_sec);
 
     { //这是一个串口发送指令流程 A
-        ESP_LOGI(TAG, "sacn# ");
+        ASW_LOGI("sacn# ");
 
         flush_serial_port(UART_NUM_1);
         memset(inv_arr, 0, sizeof(inv_arr)); // clear register
@@ -1438,6 +1478,15 @@ SERIAL_STATE scan_register(void)
 
         for (i = 0; i < 3; i++)
         {
+            ////////////////////////////////////////////////////
+            if (g_asw_debug_enable == 1)
+            {
+                ESP_LOGI("-S-", "send  scan clean sn...");
+                for (uint8_t i = 0; i < sizeof(clear_register_frame); i++)
+                    printf("<%02X> ", clear_register_frame[i]);
+                printf("\n");
+            }
+            /////////////////////////////////////////////////////
             uart_write_bytes(UART_NUM_1, (const char *)clear_register_frame, sizeof(clear_register_frame));
             sleep(1);
             // g_num_real_inv = 0;  //[lan-stick eng.stg mark 20220914 ++]
@@ -1459,18 +1508,40 @@ SERIAL_STATE scan_register(void)
 
         { //这是一个串口发送指令流程 B start
             flush_serial_port(UART_NUM_1);
+
+            ////////////////////////////////////////////////////
+            if (g_asw_debug_enable == 1)
+            {
+                ESP_LOGI("-S-", " send  scan read sn...");
+                for (uint8_t i = 0; i < sizeof(check_sn_frame); i++)
+                    printf("<%02X> ", check_sn_frame[i]);
+                printf("\n");
+            }
+            /////////////////////////////////////////////////////
             uart_write_bytes(UART_NUM_1, check_sn_frame, sizeof(check_sn_frame));
-            ESP_LOGI(TAG, "read sn frame send\r\n");
+            ASW_LOGI("read sn frame send\r\n");
 
             memset(read_frame, 0, sizeof(read_frame));
 
 #if TRIPHASE_ARM_SUPPORT
 
-             recv_bytes_scanonly(UART_NUM_1, read_frame, &len); //更换串口接收的函数，比原始函数recv_bytes_from_waiting_nomd等待时间加长，也可以在原本函数上改，
+            recv_bytes_scanonly(UART_NUM_1, read_frame, &len); //更换串口接收的函数，比原始函数recv_bytes_from_waiting_nomd等待时间加长，也可以在原本函数上改，
 #else
 
             recv_bytes_frame_waitting_nomd(UART_NUM_1, read_frame, &len);
 #endif
+            //////////////////////////////////////
+            if (g_asw_debug_enable == 1)
+            {
+                ESP_LOGI("-R-", "receive scan...");
+                for (uint8_t i = 0; i < len; i++)
+                {
+                    printf("*%02X ", read_frame[i]);
+                }
+                printf("\n");
+            }
+            ////////////////////////////////////
+
             if (read_frame[0] != 0XAA && read_frame[1] != 0X55)
                 len = 0;
             if (len == 0)
@@ -1478,7 +1549,7 @@ SERIAL_STATE scan_register(void)
             else
                 abort_cnt = 0;
 
-            ESP_LOGI(TAG, "end  %lld %lld %d \n", esp_timer_get_time(), scan_start_time_sec, abort_cnt);
+            ASW_LOGI("end  %lld %lld %d \n", esp_timer_get_time(), scan_start_time_sec, abort_cnt);
             if (abort_cnt > SCAN_ABORT_COUNT || 1 == g_scan_stop)
             {
                 printf("\n-------------scan_register--------------\n");
@@ -1488,7 +1559,7 @@ SERIAL_STATE scan_register(void)
                 goto FINISH_SCAN;
             }
 
-            ESP_LOGI(TAG, "recv frame\n");
+            ASW_LOGI("recv frame\n");
             for (i = 0; i < len; i++)
             {
                 printf("%02X ", read_frame[i]);
@@ -1503,7 +1574,7 @@ SERIAL_STATE scan_register(void)
                     parse_sn(read_frame, len, psn);
                     if (legal_check(psn) != 0)
                         continue;
-                    ESP_LOGI(TAG, "parse get psn: %s\n", psn);
+                    ASW_LOGI("parse get psn: %s\n", psn);
                     memset(buf, 0, sizeof(buf));
                     set_addr_frame_len = 0;
 
@@ -1523,38 +1594,61 @@ SERIAL_STATE scan_register(void)
                     set_addr_frame_len += 1;
                     memcpy(buf + set_addr_frame_len, &low_byte, 1);
                     set_addr_frame_len += 1;
-                    ESP_LOGI(TAG, "send modbus assign addr frame\n");
+                    ASW_LOGI("send modbus assign addr frame\n");
 
-#if DEBUG_PRINT_ENABLE
-
-                    for (i = 0; i < set_addr_frame_len; i++)
+                    // #if DEBUG_PRINT_ENABLE
+                    if (g_asw_debug_enable > 1)
                     {
-                        printf("%02X ", buf[i]);
+                        for (i = 0; i < set_addr_frame_len; i++)
+                        {
+                            printf("%02X ", buf[i]);
+                        }
                     }
-#endif
+
+                    // #endif
                 } //这是B串口数据解析流程 end
 
                 { //这是串口数据发送流程 C
                     flush_serial_port(UART_NUM_1);
+                    /////////////////////////////////////////
+                    if (g_asw_debug_enable == 1)
+                    {
+                        ESP_LOGI("-S-", " send  scan set modbusId...");
+                        for (uint8_t i = 0; i < set_addr_frame_len; i++)
+                            printf("<%02X> ", buf[i]);
+                        printf("\n");
+                    }
+                    /////////////////////////////////////////////////////
                     uart_write_bytes(UART_NUM_1, buf, set_addr_frame_len);
                     // usleep(20000);
                     memset(read_frame, 0, sizeof(read_frame));
 
-#if TRIPHASE_ARM_SUPPORT
-                    recv_bytes_scanonly(UART_NUM_1, read_frame, &len); //更换串口接收的函数，比原始函数recv_bytes_from_waiting_nomd等待时间加长，也可以在原本函数上改，
-#else
+                    // recv_bytes_scanonly(UART_NUM_1, read_frame, &len); //更换串口接收的函数，比原始函数recv_bytes_from_waiting_nomd等待时间加长，也可以在原本函数上改，
                     recv_bytes_frame_waitting_nomd(UART_NUM_1, read_frame, &len);
-#endif
+
+                    //////////////////////////////////////
+                    if (g_asw_debug_enable == 1)
+                    {
+                        ESP_LOGI("-R-", "receive scan...");
+                        for (uint8_t i = 0; i < len; i++)
+                        {
+                            printf("*%02X ", read_frame[i]);
+                        }
+                        printf("\n");
+                    }
+                    ////////////////////////////////////
                     if (read_frame[0] != 0XAA && read_frame[0] != 0X55)
                         len = 0;
-                    ESP_LOGI(TAG, "recv add frame\n");
-#if DEBUG_PRINT_ENABLE
-
-                    for (i = 0; i < len; i++)
+                    ASW_LOGI("recv add frame\n");
+                    // #if DEBUG_PRINT_ENABLE
+                    if (g_asw_debug_enable > 1)
                     {
-                        printf("%02X ", read_frame[i]);
+                        for (i = 0; i < len; i++)
+                        {
+                            printf("%02X ", read_frame[i]);
+                        }
                     }
-#endif
+                    // #endif
                 } //这是串口数据发送流程 C end
 
                 { //这是串口数据解析流程 C
@@ -1562,7 +1656,7 @@ SERIAL_STATE scan_register(void)
                     {
                         modbus_id_ack = 0;
                         parse_modbus_addr(read_frame, len, &modbus_id_ack);
-                        ESP_LOGI(TAG, "id idack: %02X %02X\n", modbus_id, modbus_id_ack);
+                        ASW_LOGI("id idack: %02X %02X\n", modbus_id, modbus_id_ack);
 
                         ////////////////////////////////////
                         Bat_arr_t mBatArryData = {0};
@@ -1575,7 +1669,7 @@ SERIAL_STATE scan_register(void)
                         // register one inv ok, please save modbus_id, psn
                         for (i = 0; i < INV_NUM; i++)
                         {
-                            ESP_LOGI(TAG, "total add: %02X \n", inv_arr[i].regInfo.modbus_id);
+                            ASW_LOGI("total add: %02X \n", inv_arr[i].regInfo.modbus_id);
 
                             if (inv_arr[i].regInfo.modbus_id == 0)
                             {
@@ -1590,11 +1684,12 @@ SERIAL_STATE scan_register(void)
                                 mBatArryData[i].modbus_id = modbus_id;
                                 memset(mBatArryData[i].sn, 0, sizeof(mBatArryData[i].sn));
                                 memcpy(mBatArryData[i].sn, psn, strlen(psn));
-#if DEBUG_PRINT_ENABLE
-                                printf("\n--------scan_register----\n");
-                                printf(" inv%d arr.type:%d , g_bat_arr ---  modbus id:%d,inv sn:%s", i, inv_arr[i].regInfo.mach_type, mBatArryData[i].modbus_id, mBatArryData[i].sn);
-                                printf("\n--------scan_register----\n");
-#endif
+                                // #if DEBUG_PRINT_ENABLE
+                                ASW_LOGI("\n--------scan_register----\n");
+                                ASW_LOGI(" inv%d arr.type:%d , g_bat_arr ---  modbus id:%d,inv sn:%s",
+                                         i, inv_arr[i].regInfo.mach_type, mBatArryData[i].modbus_id, mBatArryData[i].sn);
+                                // printf("\n--------scan_register----\n");
+                                // #endif
                                 /////////////////////////////////////////////////////////////////
 
                                 //---Eng.Stg.Mch---//
@@ -1634,7 +1729,7 @@ SERIAL_STATE scan_register(void)
     }
 
 FINISH_SCAN:
-    ESP_LOGI(TAG, "end scan \n");
+    ASW_LOGI("end scan \n");
     if (reg_num >= 0)
     {
         ///////////////////////////
@@ -1647,7 +1742,7 @@ FINISH_SCAN:
         save_reg_info(); /** inv_arr存到另一个地方*/
         ESP_LOGI(TAG, "total register num: %d\n", reg_num);
         reg_info_log();
-        ESP_LOGI(TAG, "end **\n");
+        ASW_LOGI("end **\n");
         usleep(100000);
 
         // g_num_real_inv = reg_num;
@@ -1848,7 +1943,6 @@ void cld_idle_work(void)
 //-------------------------//
 void com_idle_work(void)
 {
-    // if (memcmp(&ipc_inv_arr, &inv_arr, sizeof(Inv_arr_t)) != 0)
     inv_arr_memcpy(&ipc_inv_arr, &inv_arr);
     check_estore_become_online();
     inv_get_time_each_12h();
@@ -1898,7 +1992,35 @@ int is_safety_96_97(void)
     }
     return 0;
 }
+//----------------------------//
 
+//并机模式下，只检测主机安规，否则检测第一台逆变器的安规
+
+int asw_is_safety_96_97(void)
+{
+    uint8_t safe_num = 0;
+    uint8_t mId = 0;
+    if (g_parallel_enable)
+    {
+        for (uint8_t i = 0; i < g_num_real_inv; i++)
+        {
+            if (g_host_modbus_id == inv_arr[i].regInfo.modbus_id)
+                mId = i;
+        }
+    }
+    ASW_LOGI(" safty 96 97 get modbusId:%d", mId);
+
+    if (inv_arr[mId].regInfo.mach_type > 10 && inv_arr[mId].status) // estore && online
+    {
+        safe_num = inv_arr[mId].regInfo.safety_type;
+    }
+
+    if (safe_num == 96 || safe_num == 97 || safe_num == 80)
+    {
+        return 1;
+    }
+    return 0;
+}
 //----------------------------//
 //读取逆变器重放电深度寄存器
 static int asw_readreg_battery_discharge_info()
@@ -1942,8 +2064,9 @@ static int asw_readreg_battery_discharge_info()
             monitor_para_arr[i].batmonitor.chg_max = 100;
         }
 
-        printf("\n==========  load inv:%d-%s reg charge/discharge %d,%d:",
-               monitor_para_arr[i].modbus_id, monitor_para_arr[i].sn, monitor_para_arr[i].batmonitor.chg_max, monitor_para_arr[i].batmonitor.dchg_max);
+        ASW_LOGI("load inv:%d-%s reg charge/discharge %d,%d:",
+                 monitor_para_arr[i].modbus_id, monitor_para_arr[i].sn,
+                 monitor_para_arr[i].batmonitor.chg_max, monitor_para_arr[i].batmonitor.dchg_max);
     }
 
     write_global_var(PARA_CONFIG, &monitor_para_arr);

@@ -3,6 +3,7 @@
 
 #define MAX_HIST_DATA_SIZE 1024 * 2000 /** 2000 KB*/
 
+static const char * TAG="save_in_data.c";
 int net_com_reboot_flg = 0;
 /********************************/
 
@@ -138,7 +139,6 @@ int recive_invdata(int *flag, Inv_data *inv_data, int *lost_flag)
         }
         else
         {
-            // printf("cannot recv data \n");
             *flag = 0;
         }
     }
@@ -157,10 +157,10 @@ int recive_invdata(int *flag, Inv_data *inv_data, int *lost_flag)
         if (*lost_flag != 1)
         {
             write_lost_index(lost_line);
-            // printf("read next line %d \n", *lost_flag);
+            // ASW_LOGI("read next line %d \n", *lost_flag);
             if ((res = read_lost_data(&invdata, &lost_line)) >= 0)
             {
-                printf("read %d st line \n", lost_line);
+                ASW_LOGI("read %d st line \n", lost_line);
                 *flag = 1;
                 *lost_flag = 1;
                 *inv_data = invdata;
@@ -168,7 +168,7 @@ int recive_invdata(int *flag, Inv_data *inv_data, int *lost_flag)
             }
             if (res == -2)
             {
-                printf("read lost data crc error , contiue loop\n");
+                ASW_LOGI("read lost data crc error , contiue loop\n");
                 *flag = 0;
                 *lost_flag = 2;
                 // write_lost_index(lost_line);
@@ -177,7 +177,6 @@ int recive_invdata(int *flag, Inv_data *inv_data, int *lost_flag)
             }
             if (res == -1)
             {
-                // printf("don't found lost data , contiue loop\n");
                 *flag = 0;
                 *lost_flag = 0;
                 // write_lost_index(lost_line);
@@ -187,17 +186,11 @@ int recive_invdata(int *flag, Inv_data *inv_data, int *lost_flag)
         }
         else
         {
-            printf("copy preline %d line \n", lost_line);
+            ASW_LOGI("copy preline %d line \n", lost_line);
             *inv_data = tmp_invdata;
             *flag = 1;
             *lost_flag = 1;
         }
-        // if(check_sn_format(inv_data->psn)<15 || ((inv_data->time[0]-0x30)*10+(inv_data->time[0]-0x30)<20) )
-        // {
-        //     *flag = 0;
-        //     *lost_flag=0;
-        // }
-        // printf("read time %d \n", (inv_data->time[0]-0x30)*10+(inv_data->time[0]-0x30));
     }
     return 0;
 }
@@ -600,23 +593,22 @@ int read_instant_payload(char *msg)
     {
         if (xQueueReceive(mq0, &invdata, (TickType_t)10) == pdPASS)
         {
-            printf("\nrecv invdata stru ok %s\n",invdata.psn);
+            ASW_LOGI("recv invdata stru ok %s\n", invdata.psn);
             char buf[1536] = {0};
             if (is_cld_has_estore() == 1)
             {
                 get_estore_invdata_payload(&invdata, buf);
-                // printf("create json++: %s\n", buf);
             }
             else
             {
                 // get_invdata_payload(invdata, buf);
-                printf("\n--------  no support to Grid-connected inverter !\n");
+                ESP_LOGW(TAG, "--------  no support to Grid-connected inverter !\n");
             }
 
             int len = strlen(buf);
             if ((g_state_mqtt_connect == 0) && (!netework_state || (g_monitor_state && INV_SYNC_PMU_STATE))) // net ok
             {
-                printf("net ok, send it\n");
+                ASW_LOGI("net ok, send it\n");
                 /** net ok, generate json, return it*/
                 memset(msg, 0, JSON_MSG_SIZE);
                 memcpy(msg, buf, len);
@@ -624,7 +616,7 @@ int read_instant_payload(char *msg)
             }
             else
             {
-                printf("net error, save it\n");
+                ESP_LOGW(TAG, "net error, save it\n");
                 /** no net ,generate json, store, return -1*/
                 if (0 == check_time_correct())
                 {

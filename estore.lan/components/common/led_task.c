@@ -130,7 +130,6 @@ void led_task(void *pvParameters)
     fresh_led(GREEN_LED_GPIO, LIGHT_OFF);
     fresh_led(BLUE_LED_GPIO, LIGHT_OFF);
 
-
     ESP_LOGW(TAG, "Led task is begined !!");
 
     while (1)
@@ -225,10 +224,10 @@ void led_task(void *pvParameters)
                     re_conn = 0;
                     printf("wifi_reconnect 3s \n");
                 }
-    
+
                 // AP 模式下 30min 连不上 重启, 或者sta模式下无连接信息时
                 if ((g_stick_run_mode == Work_Mode_AP_PROV || (g_stick_run_mode == Work_Mode_LAN && get_eth_connect_status() != 0)) 
-                && (get_second_sys_time() - net_disconnect_time) > 1200)  //1800  20min
+                && (get_second_sys_time() - net_disconnect_time) > 1200) // 1800  20min
                 {
                     printf("scan sta ap \n");
                     if (find_now_apname() == 0)
@@ -286,8 +285,9 @@ void led_task(void *pvParameters)
             old_stick_run_mode = g_stick_run_mode;
         }
 
-        /////////////////////////////  STATIC INFO ///////////////////////////////////////////
-        if (old_state_ethernet_connect != g_state_ethernet_connect && g_state_ethernet_connect == 1)
+/////////////////////////////  STATIC INFO ///////////////////////////////////////////
+#if 0 //插入网口后，重启进入lan模式
+        if (old_state_ethernet_connect != g_state_ethernet_connect && g_state_ethernet_connect == 1 && g_stick_run_mode!= Work_Mode_LAN )
         {
             printf("\n===LED TASK:   run mode change to Lan \n");
             g_stick_run_mode = Work_Mode_LAN; // Lan 模式
@@ -300,6 +300,7 @@ void led_task(void *pvParameters)
         }
 
         old_state_ethernet_connect = g_state_ethernet_connect;
+#endif
         /////////////////////////////////////////////////////////////////////////////////////////////
         usleep(10000); // 10ms 100
         re_conn++;

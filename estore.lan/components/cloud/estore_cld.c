@@ -3,6 +3,7 @@
 #include "asw_job_http.h"
 
 extern char DEMO_DEVICE_NAME[IOTX_DEVICE_NAME_LEN + 1];
+static const char *TAG = "asw_modbus.c";
 
 int is_cld_has_estore(void)
 {
@@ -105,9 +106,9 @@ int get_estore_invinfo_payload(InvRegister devicedata, char *json_str)
         }
     }
 
-    printf("\n---------  get estore inv info payload ---- :%d  --------\n", mindex);
-    printf("sta_b:%d,typ_b:%d,mod_r:%d", monitor_para[mindex].batmonitor.uu4, monitor_para[mindex].batmonitor.dc_per, monitor_para[mindex].batmonitor.uu1);
-    printf("\n---------  get estore inv info payload -------- \n");
+    ASW_LOGI("---------  get estore inv info payload ---- :%d  -------", mindex);
+    ASW_LOGI("sta_b:%d,typ_b:%d,mod_r:%d", monitor_para[mindex].batmonitor.uu4, monitor_para[mindex].batmonitor.dc_per, monitor_para[mindex].batmonitor.uu1);
+    ASW_LOGI("\n---------  get estore inv info payload -------- \n");
 
     if (mindex == -1)
     {
@@ -294,7 +295,7 @@ int get_estore_invdata_payload(Inv_data *inv, char *json_str)
         if (strcmp(inv->psn, m_battery_arr_data[i].sn) == 0)
         {
             mInvIndex = i;
-            printf("\n===== DEBUG PRINT:UpdateInvData=====\n ---get index:%d \n", i);
+            ASW_LOGI("\n===== DEBUG PRINT:UpdateInvData=====\n ---get index:%d \n", i);
             break;
         }
     }
@@ -406,9 +407,7 @@ int asw_write_inv_onoff(cJSON *json)
 
     if (getJsonNum(&setpower, "power", json) == 0)
     {
-#if DEBUG_PRINT_ENABLE
-        printf("\n--------- set power get power:%d------------", setpower);
-#endif
+        ASW_LOGI("\n--------- set power get power:%d------------", setpower);
         if (broadcastEnable)
         {
             for (uint8_t m = 0; m < g_num_real_inv; m++)
@@ -451,10 +450,6 @@ int write_battery_configuration(cJSON *setbattery)
     Bat_Monitor_arr_t monitor_para = {0};
     read_global_var(PARA_CONFIG, &monitor_para);
     ////////////////////////////////////////////////////////////
-
-    // char *msgBuf = cJSON_PrintUnformatted(setbattery);
-    // printf("\nget setbattery josn value:%s\n", msgBuf);
-    // free(msgBuf);
 
     char crt_psn[33] = {0};
     getJsonStr(crt_psn, "sn", sizeof(crt_psn), setbattery);
@@ -534,21 +529,53 @@ int write_battery_configuration(cJSON *setbattery)
         else
             index = asw_get_index_byPsn(crt_psn);
 
-        getJsonNum(&monitor_para[index].batmonitor.dc_per, "type", setbattery);
+        getJsonNumU8(&monitor_para[index].batmonitor.dc_per, "type", setbattery);
 
-        getJsonNum(&monitor_para[index].batmonitor.uu1, "mod_r", setbattery);
+        getJsonNumU8(&monitor_para[index].batmonitor.uu1, "mod_r", setbattery);
+
+        //// 判断是否为自定义模式 并机模式下，主机设置为自定义模式，则发送到主机;普通模式下
+        //    g_battery_selfmode_is_same, g_parallel_enable, g_host_modbus_id);
+
+        if (monitor_para[index].batmonitor.uu1 == 4 && monitor_para[index].batmonitor.dc_per == 1 && g_parallel_enable && g_host_modbus_id == monitor_para[index].modbus_id)
+        {
+            g_battery_selfmode_is_same = 1;
+        }
+        else if (monitor_para[index].batmonitor.uu1 == 4 && g_parallel_enable == 0 && monitor_para[index].batmonitor.dc_per == 1)
+        {
+            uint8_t i = 0;
+            for (i = 0; i < g_num_real_inv; i++)
+            {
+                if (monitor_para[i].batmonitor.uu1 != 4)
+                {
+                    g_battery_selfmode_is_same = 0;
+                    break;
+                }
+            }
+            if (i == g_num_real_inv)
+                g_battery_selfmode_is_same = 1;
+        }
+        else if (monitor_para[index].batmonitor.uu1 != 4 && g_parallel_enable == 0)
+        {
+            g_battery_selfmode_is_same = 0;
+        }
+        else if ((monitor_para[index].batmonitor.uu1 != 4 || monitor_para[index].batmonitor.dc_per != 1) && g_parallel_enable && g_host_modbus_id == monitor_para[index].modbus_id)
+        {
+            g_battery_selfmode_is_same = 0;
+        }
+
+        printf("\n Set battery, g_battery_selfmode_is_same :%d\n", g_battery_selfmode_is_same);
 
         //--------------------------------------//
 
-        if (getJsonNum(&monitor_para[index].batmonitor.up1, "muf", setbattery) == 0)
+        if (getJsonNumU8(&monitor_para[index].batmonitor.up1, "muf", setbattery) == 0)
         {
             b_info = 1;
         }
-        if (getJsonNum(&monitor_para[index].batmonitor.uu2, "mod", setbattery) == 0)
+        if (getJsonNumU8(&monitor_para[index].batmonitor.uu2, "mod", setbattery)==0)
         {
             b_info = 1;
         }
-        if (getJsonNum(&monitor_para[index].batmonitor.up2, "num", setbattery) == 0)
+        if (getJsonNumU8(&monitor_para[index].batmonitor.up2, "num", setbattery) == 0)
         {
             b_info = 1;
         }
@@ -588,7 +615,7 @@ int write_battery_configuration(cJSON *setbattery)
 int write_meter_configuration(cJSON *value)
 {
 
-    printf("\n------DEBUG Print------ write_meter_configuration -----\n ");
+    ASW_LOGI("\n------DEBUG Print------ write_meter_configuration -----\n ");
     int tmp_int = 0;
     MonitorPara monitor_para = {0};
 
@@ -631,8 +658,6 @@ int write_meter_configuration(cJSON *value)
         monitor_para.adv.regulate_offset = 0;
     }
 
-
-
 #else
     if (getJsonNum(&tmp_int, "offset", value) == 0)
     {
@@ -640,14 +665,14 @@ int write_meter_configuration(cJSON *value)
     }
 
 #endif
-    printf("\n------DEBUG Print------ set meter config -----\n ");
+    ASW_LOGI("\n------DEBUG Print------ set meter config -----\n ");
     // monitor_para.adv.meter_mod = 100;
-    printf("enb: %d\n", monitor_para.adv.meter_enb);
-    printf("mod: %d\n", monitor_para.adv.meter_mod);
-    printf("target: %d\n", monitor_para.adv.meter_target);
-    printf("regulate: %d\n", monitor_para.adv.meter_regulate);
-    printf("enb_PF: %d\n", monitor_para.adv.meter_enb_PF);
-    printf("target_PF: %d\n", monitor_para.adv.meter_target_PF);
+    ASW_LOGI("enb: %d\n", monitor_para.adv.meter_enb);
+    ASW_LOGI("mod: %d\n", monitor_para.adv.meter_mod);
+    ASW_LOGI("target: %d\n", monitor_para.adv.meter_target);
+    ASW_LOGI("regulate: %d\n", monitor_para.adv.meter_regulate);
+    ASW_LOGI("enb_PF: %d\n", monitor_para.adv.meter_enb_PF);
+    ASW_LOGI("target_PF: %d\n", monitor_para.adv.meter_target_PF);
 
     monitor_para.adv.meter_day = get_current_days();
 
@@ -687,7 +712,7 @@ int write_battery_define(cJSON *value)
         // monitor_para[index].batmonitor.ov_t1 = num;
         schedule_bat.ov_t1 = num;
     }
-    printf("Pin Pout parsed ok\n");
+    ASW_LOGI("Pin Pout parsed ok\n");
 
     /////////////////////////////////////////////////////////////////////
 
@@ -708,13 +733,13 @@ int write_battery_define(cJSON *value)
                 {
                     schedule_bat.daySchedule[j].time_sch[i] = pItem->valueint;
 
-                    // printf("**********write_battery_define->schedule_bat.daySchedule[%d].time_sch[%d]:%d\r\n", j, i, pItem->valueint);
+                    // ASW_LOGI("**********write_battery_define->schedule_bat.daySchedule[%d].time_sch[%d]:%d\r\n", j, i, pItem->valueint);
                 }
             }
         }
         else
         {
-            printf("Not found Sun Mon Tus ...\n");
+            ASW_LOGI("Not found Sun Mon Tus ...\n");
         }
     }
     write_global_var_to_nvs(PARA_SCHED_BAT, &schedule_bat);
@@ -745,7 +770,7 @@ int read_battery_define(int day_idx, char *buffer)
     cJSON_AddNumberToObject(res, "Pin", schedule_bat.fq_t1);
     cJSON_AddNumberToObject(res, "Pout", schedule_bat.ov_t1);
 
-    printf("\n--------------  getdefine --------------[%d]\n", day_idx);
+    ASW_LOGI("\n--------------  getdefine --------------[%d]\n", day_idx);
 
     if (day_idx >= 0 && day_idx <= 6)
     {
@@ -788,9 +813,9 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
     char *recv_ok = "{\"dat\":\"ok\"}";
     char *recv_er = "{\"dat\":\"err\"}";
 
-    printf("\n----------  DEBUG PRINT --parse_estore_mqtt_msg_rrpc-------\n");
-    // printf(" topic:%s,payload:%s", rpc_topic, (char *)payload);
-    // printf("\n----------  DEBUG PRINT --parse_estore_mqtt_msg_rrpc-------\n");
+    ASW_LOGI("\n----------  DEBUG PRINT --parse_estore_mqtt_msg_rrpc-------\n");
+    printf(" topic:%.*s,payload:%.*s", rpc_len, rpc_topic, data_len, (char *)payload);
+    ASW_LOGI("\n----------  DEBUG PRINT --parse_estore_mqtt_msg_rrpc-------\n");
 
     if (strlen(payload) < 3)
         return -1;
@@ -804,7 +829,7 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
     char resp_topic[256] = {0};
     if (get_rrpc_restopic(rpc_topic, rpc_len, resp_topic) < 0)
     {
-        printf("mqtt rrpc topic too long \n");
+        ASW_LOGI("mqtt rrpc topic too long \n");
         // asw_mqtt_publish(resp_topic, (uint8_t *)recv_er, strlen(recv_er), 0);
         cJSON_Delete(json);
         return -1;
@@ -960,7 +985,7 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
         memset(ws, 'R', 64);
         strncpy(msg, cJSON_GetObjectItem(json, "fdbg")->valuestring, 300);
 
-        printf("ms %s ws %s \n", msg, ws);
+        ASW_LOGI("ms %s ws %s \n", msg, ws);
         memset(rrpc_res_topic, 0, sizeof(rrpc_res_topic));
         memcpy(rrpc_res_topic, resp_topic, strlen(resp_topic));
         send_msg(2, msg, strlen(msg), ws);
@@ -969,15 +994,15 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
     {
         cJSON *item = cJSON_GetObjectItem(json, "upgrade");
         char up_type = cJSON_GetObjectItem(item, "type")->valueint;
-        printf("update type %d \n", up_type);
+        ASW_LOGI("update type %d \n", up_type);
 
         cJSON *item1 = cJSON_GetObjectItem(item, "path");
         char *url0 = cJSON_GetObjectItem(item1, "directory")->valuestring;
-        printf("url %s \n", url0);
+        ASW_LOGI("url %s \n", url0);
 
         cJSON *item2 = cJSON_GetObjectItem(item1, "files");
-        printf("file type %d %d \n", item2->type, cJSON_GetArraySize(item2));
-        printf("meter str %s \n", cJSON_GetArrayItem(item2, 0)->valuestring);
+        ASW_LOGI("file type %d %d \n", item2->type, cJSON_GetArraySize(item2));
+        ASW_LOGI("meter str %s \n", cJSON_GetArrayItem(item2, 0)->valuestring);
         char *p[cJSON_GetArraySize(item2)];
 
         update_url download_url = {0};
@@ -998,8 +1023,8 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
             }
         }
         asw_mqtt_publish(resp_topic, (char *)recv_ok, strlen(recv_ok), 0); // res update
-        printf("dowan_loadurl %s  %d %d\n", download_url.down_url, download_url.update_type, strlen(download_url.down_url));
-        printf("RRPCRESP %s  %s \n", resp_topic, recv_ok);
+        ASW_LOGI("dowan_loadurl %s  %d %d\n", download_url.down_url, download_url.update_type, strlen(download_url.down_url));
+        ASW_LOGI("RRPCRESP %s  %s \n", resp_topic, recv_ok);
 
         TaskHandle_t download_task_handle = NULL;
         BaseType_t xReturned;
@@ -1012,7 +1037,7 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
             &download_task_handle); /* Used to pass out the created task's handle. */
         if (xReturned != pdPASS)
         {
-            printf("create cgi task failed.\n");
+            ASW_LOGI("create cgi task failed.\n");
         }
     }
     else if (cJSON_HasObjectItem(json, "setpower") == 1)
@@ -1043,9 +1068,13 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
         asw_mqtt_publish(resp_topic, recv_ok, strlen(recv_ok), 0);
         cJSON *setmeter = cJSON_GetObjectItem(json, "setmeter");
         write_meter_configuration(setmeter);
-        event_group_0 |= METER_CONFIG_MASK;
+
         event_group_0 |= PWR_REG_SOON_MASK;
         g_meter_sync = 0;
+
+        /*根据调试打印设置值，判断是否进行数据打印*/
+        if (g_asw_debug_enable > 1)
+            event_group_0 |= METER_CONFIG_MASK;
     }
     /** K60中没有的********************************************************************************************/
     else if (cJSON_HasObjectItem(json, "setscan") == 1 && cJSON_GetObjectItem(json, "setscan")->valueint > 0)
@@ -1055,12 +1084,12 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
         unsigned int cnt = 10;
         // cJSON *item = cJSON_GetObjectItem(json, "value");
 
-        // printf("cnt int %d \n", cJSON_GetObjectItem(item, "setscan")->valueint);
+        // ASW_LOGI("cnt int %d \n", cJSON_GetObjectItem(item, "setscan")->valueint);
 
         // cnt = cJSON_GetObjectItem(item, "setscan")->valueint;
         int byteLen = 1;
         u8msg[0] = cnt;
-        printf("cnt int %d  %s\n", cnt, u8msg);
+        ASW_LOGI("cnt int %d  %s\n", cnt, u8msg);
         send_msg(5, (char *)u8msg, byteLen, NULL);
         asw_mqtt_publish(resp_topic, (char *)recv_ok, strlen(recv_ok), 0); // res scan
     }
@@ -1076,7 +1105,7 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
         memset(ws, 'U', 64);
         // strncpy(msg, cJSON_GetObjectItem(json, "fdbg")->valuestring, 300);
         msg[0] = cJSON_GetObjectItem(json, "reboot")->valueint;
-        printf("ms %d ws %s \n", msg[0], ws);
+        ASW_LOGI("ms %d ws %s \n", msg[0], ws);
         // memcpy(rrpc_res_topic, resp_topic, strlen(resp_topic));
         send_msg(99, msg, 1, ws);
         asw_mqtt_publish(resp_topic, (char *)recv_ok, strlen(recv_ok), 0);
@@ -1110,7 +1139,7 @@ int parse_estore_mqtt_msg_rrpc(char *rpc_topic, int rpc_len, void *payload, int 
         char buff[1024] = {0};
         // get_sys_log(bufx);
         get_all_log(buff);
-        printf("rrpcsyslog %d--%s \n", strlen(buff), buff);
+        ASW_LOGI("rrpcsyslog %d--%s \n", strlen(buff), buff);
 
         if (strlen(buff))
             asw_mqtt_publish(resp_topic, (char *)buff, strlen(buff), 0);

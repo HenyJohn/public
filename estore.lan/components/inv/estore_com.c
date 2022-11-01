@@ -1,6 +1,8 @@
 #include "estore_com.h"
 #include "asw_mutex.h"
 
+static const char *TAG = "estore_com.c";
+
 // Bat_arr_t g_bat_arr = {0}; /// Lanstick-MultiInv +
 
 int md_decode_bat_data(uint8_t *buf, int reg_num, Batt_data *bat_data_ptr)
@@ -203,17 +205,15 @@ void read_bat_if_has_estore(void)
 void asw_read_bat_arr_data(Inverter *inv_ptr)
 {
     uint8_t m_inv_md_id = 0;
-#if DEBUG_PRINT_ENABLE
+    // #if DEBUG_PRINT_ENABLE
 
-    printf("\n-----------asw_read_bat_arr_data -------------\n");
-    printf("read bat data -sn:%s-", inv_ptr->regInfo.sn);
-    printf("\n-----------asw_read_bat_arr_data -------------\n");
-#endif
+    ASW_LOGI("read bat data -sn:%s-", inv_ptr->regInfo.sn);
+    // #endif
     m_inv_md_id = inv_ptr->regInfo.modbus_id;
 
     if (inv_ptr->regInfo.mach_type <= 10 || inv_ptr->status != 1) // estore && online
     {
-        ESP_LOGW("-- Read Bat data Warn---", " the type or state is no right ,no data to read.");
+        ASW_LOGW(" the type or state is no right ,no data to read.");
         return;
     }
 
@@ -226,7 +226,7 @@ void asw_read_bat_arr_data(Inverter *inv_ptr)
 
     if (res != 0)
     {
-        ESP_LOGW("-- Read Bat data Warn---", " return ");
+        ESP_LOGW("-- Read Bat data Warn---", " return inv:%d-res:%d ",m_inv_md_id,res);
         return;
     }
 
@@ -239,7 +239,7 @@ void asw_read_bat_arr_data(Inverter *inv_ptr)
 
             memcpy(&mBatsArryDatas[k].batdata, &data, sizeof(Batt_data));
 
-            ESP_LOGI("-- Read Bat data INFO---", "Update data to g_bat_arr %s!!!",mBatsArryDatas[k].sn);
+            ASW_LOGI("Update data to g_bat_arr %s!!!", mBatsArryDatas[k].sn);
 
             break;
         }

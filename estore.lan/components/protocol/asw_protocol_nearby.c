@@ -81,7 +81,8 @@ static char *getdev_handle_type_1_fun()
 
     //--\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\-//
     if (miSetHost)
-        cJSON_AddNumberToObject(res, "host", mt.is_parallel);
+        cJSON_AddNumberToObject(res, "parallel", mt.is_parallel);
+    cJSON_AddNumberToObject(res, "ssc", mt.ssc_enable);
 
     if (is_cgi_has_estore()) //储能机
     {
@@ -273,10 +274,6 @@ static char *getdev_handle_type_4_fun(char *psn)
     cJSON_AddNumberToObject(res, "discharge_max", monitor_para[index].batmonitor.dchg_max);
     cJSON_AddNumberToObject(res, "charge_max", monitor_para[index].batmonitor.chg_max);
 
-    /* tgl mark TODO DONE */
-    // cJSON_AddNumberToObject(res, "discharge_max", monitor_para.adv.freq_mode);
-    // cJSON_AddNumberToObject(res, "charge_max", monitor_para.adv.freq_mode);
-
     msgBuf = cJSON_PrintUnformatted(res);
 
     cJSON_Delete(res);
@@ -336,7 +333,9 @@ static char *getdev_handle_type_default_fun()
     //     miSetHost = 1;
     ///////////////////////////////////////////////////////////
     if (miSetHost)
-        cJSON_AddNumberToObject(res, "host", mt.is_parallel); // add for new
+        cJSON_AddNumberToObject(res, "parallel", mt.is_parallel); // add for new
+
+    cJSON_AddNumberToObject(res, "ssc", mt.ssc_enable); // add for new
 
     msg = cJSON_PrintUnformatted(res);
 
@@ -351,13 +350,12 @@ static char *getdevdata_handle_type_2_fun(char *inv_sn)
 
     for (i = 0; i < g_num_real_inv; i++)
     {
-#if DEBUG_PRINT_ENABLE
+        // #if DEBUG_PRINT_ENABLE
 
-        printf("\n==========get devdata debug========\n");
-        printf("current sn=%s\n", inv_sn);
-        printf(" sn[%d]=%s", i, cgi_inv_arr[i].regInfo.sn);
-        printf("\n==========get devdata debug========\n");
-#endif
+        ASW_LOGI("\n==========get devdata debug========\n");
+        ASW_LOGI("current sn=%s\n", inv_sn);
+        ASW_LOGI(" sn[%d]=%s", i, cgi_inv_arr[i].regInfo.sn);
+        // #endif
         if (strcmp(cgi_inv_arr[i].regInfo.sn, inv_sn) == 0)
             break;
     }
@@ -367,13 +365,11 @@ static char *getdevdata_handle_type_2_fun(char *inv_sn)
         ASW_LOGW("device not found");
         return NULL;
     }
-#if DEBUG_PRINT_ENABLE
+    // #if DEBUG_PRINT_ENABLE
 
-    printf("\n===========inv data print==============\n");
-    printf("cgi_inv_arr[%d].PV_cur_voltg[0].iVol=%d\n", i, cgi_inv_arr[i].invdata.PV_cur_voltg[0].iVol);
-    printf("\n===========inv data print==============\n");
+    ASW_LOGI("cgi_inv_arr[%d].PV_cur_voltg[0].iVol=%d\n", i, cgi_inv_arr[i].invdata.PV_cur_voltg[0].iVol);
 
-#endif
+    // #endif
     cJSON *res = cJSON_CreateObject();
 
     cJSON_AddNumberToObject(res, "flg", cgi_inv_arr[i].invdata.status);
@@ -473,18 +469,7 @@ static char *getdevdata_handle_type_3_fun()
     cJSON_AddNumberToObject(res, "mod", monitor_para.adv.meter_mod);
     // cJSON_AddNumberToObject(res, "mod", 100);
     cJSON_AddNumberToObject(res, "enb", monitor_para.adv.meter_enb);
-#if 0
-    cJSON_AddNumberToObject(res, "flg", g_inv_meter.invdata.status);
-    cJSON_AddStringToObject(res, "tim", g_inv_meter.invdata.time);
-    // printf("g_inv_meter.invdata.pac %d \n", g_inv_meter.invdata.pac);
-    cJSON_AddNumberToObject(res, "pac", (int)g_inv_meter.invdata.pac);
-    cJSON_AddNumberToObject(res, "itd", g_inv_meter.invdata.con_stu);
-    cJSON_AddNumberToObject(res, "otd", g_inv_meter.invdata.e_today);
-    cJSON_AddNumberToObject(res, "iet", g_inv_meter.invdata.e_total); // h_total);
-    cJSON_AddNumberToObject(res, "oet", g_inv_meter.invdata.h_total); // e_total);
-    cJSON_AddNumberToObject(res, "mod", g_merter_config.mod);
-    cJSON_AddNumberToObject(res, "enb", g_merter_config.enb);
-#endif
+
     msg = cJSON_PrintUnformatted(res);
 
     cJSON_Delete(res);
@@ -503,14 +488,14 @@ static char *getdevdata_handle_type_4_fun(char *inv_sn)
     read_global_var(GLOBAL_BATTERY_DATA, &mBattArray_data);
     for (i = 0; i < g_num_real_inv; i++)
     {
-#if DEBUG_PRINT_ENABLE
+        // #if DEBUG_PRINT_ENABLE
 
-        printf("\n==========get devdata debug handle ========\n");
-        printf("current sn=%s\n", inv_sn);
-        printf(" sn[%d]=%s", i, mBattArray_data[i].sn);
-        printf("\n==========get devdata debug handle========\n");
+        // printf("\n==========get devdata debug handle ========\n");
+        ASW_LOGI("current sn=%s\n", inv_sn);
+        ASW_LOGI(" sn[%d]=%s", i, mBattArray_data[i].sn);
+        // printf("\n==========get devdata debug handle========\n");
+        // #endif
 
-#endif
         if (strcmp(mBattArray_data[i].sn, inv_sn) == 0)
             break;
     }
@@ -1231,9 +1216,11 @@ static int16_t setting_handler_device_3_fun(char *action, cJSON *value)
     {
         //-- Eng.Stg.Mch-lanstick 20220908 +-
         write_meter_configuration(value);
-        event_group_0 |= METER_CONFIG_MASK;
         event_group_0 |= PWR_REG_SOON_MASK;
         g_meter_sync = 0;
+        /*根据调试打印设置值，判断是否进行数据打印*/
+        if (g_asw_debug_enable > 1)
+            event_group_0 |= METER_CONFIG_MASK;
 
         return 0;
     }
